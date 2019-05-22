@@ -10,6 +10,10 @@ lex.yy.c
 binary.tab.hh
 binary.tab.cc
 binary.output
+parse.dot.pdf
+parse.dot
+cfg.dot
+cfg.dot.pdf
 
 # Compiled source #
 ###################
