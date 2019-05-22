@@ -1,0 +1,35 @@
+# Don't track content of these folders
+.vscode/
+
+# Don't track these files
+target.cc
+target
+int
+stack.hh
+lex.yy.c
+binary.tab.hh
+binary.tab.cc
+binary.output
+
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Packages #
+############
+# it's better to unpack these files and commit the raw source
+# git has its own built in compression methods
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+*.tgz

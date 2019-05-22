@@ -9,4 +9,4 @@ binary.tab.cc: binary.yy
 lex.yy.c: binary.ll binary.tab.cc
 		flex binary.ll
 clean:
-		rm -f binary.tab.* lex.yy.c* int binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh
+		rm -f binary.tab.* lex.yy.c* int binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.cc
