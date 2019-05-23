@@ -236,7 +236,6 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
 
     // Functions.
 
-
     file << "int main()\n{\n";
 
     // Initialize the variables.

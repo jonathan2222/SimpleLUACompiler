@@ -1,4 +1,4 @@
-FILES = binary.tab.o lex.yy.c main.cc AST/AST.cpp AST/Environment.cpp AST/Data.cpp AST/Ret.cpp AST/Comp.cpp AST/Symbols.cpp
+FILES = binary.tab.o lex.yy.c main.cc AST/AST.cpp AST/Data.cpp AST/Comp.cpp AST/Symbols.cpp
 
 parser: $(FILES)
 		g++ -std=c++11 -g -o int $(FILES)

@@ -33,25 +33,8 @@ public:
 	void fillCfg(std::ofstream& file, BBlock* start);
 	
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out);
-
-	virtual Entry& eval() { return this->entry; };
 	
 	void addChild(Node* child, bool isTopBlock = false);
-
-	/*
-		Convert the data to return data.
-	*/
-	void toRet();
-
-	/*
-		Set the ret to another one.
-	*/
-	void setRet(const Ret& other, unsigned index = 0);
-
-	/*
-		Like setRet but do not touch the pointers.
-	*/
-	void setData(const Ret& other, unsigned index = 0);
 
 	void addSymbol(const std::string& key, Symbol& sym);
 	Symbol getSymbol(const std::string& key);
@@ -68,7 +51,6 @@ public:
 	bool haveChildrenSymbols() const;
 	void printAllSymbols(unsigned depth = 0) const;
 	std::string toString() const;
-	void printAllEnv(unsigned depth = 0) const;
 	unsigned printParents() const;
 	// ---------------------------
 	
@@ -83,10 +65,7 @@ public:
 	// Data for each node.
 	Data data;
 	Data ret;
-	// All nodes have return object. 
-	Entry entry;
-	// Environment
-	Environment* scope = nullptr;
+	
 	bool isTopBlock;
 
 	Symbols* symbols = nullptr;

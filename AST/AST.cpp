@@ -17,7 +17,6 @@ std::string strSides(const std::string str, std::string c)
 Node::Node(const std::string& tag)
 {
 	this->tag = tag;
-	toRet();
 	makeName();
 	makeId();
 }
@@ -26,7 +25,6 @@ Node::Node(const std::string& tag, const Data& data)
 {
 	this->tag = tag;
 	this->data = data;
-	toRet(); 
 	makeName();
 	makeId();
 
@@ -207,30 +205,6 @@ void Node::addChild(Node* child, bool isTopBlock)
 	this->children.push_back(child);
 	child->parent = this;
 	child->isTopBlock = isTopBlock;
-	child->toRet();
-}
-
-void Node::toRet()
-{
-	this->entry.returns.clear();
-	this->entry.returns.push_back(Ret());
-	this->entry.returns[0].to(this);
-}
-
-void Node::setRet(const Ret& other, unsigned index)
-{
-	if(index < this->entry.returns.size())
-		this->entry.returns[index] = other;
-	else
-		std::cout << "[ERROR] Could not set return, index out of bounds!" << std::endl;
-}
-
-void Node::setData(const Ret& other, unsigned index)
-{
-	if(index < this->entry.returns.size())
-		this->entry.returns[index].data.setVal(other.data);
-	else
-		std::cout << "[ERROR] Could not set return, index out of bounds!" << std::endl;	
 }
 
 void Node::addSymbol(const std::string& key, Symbol& sym)
@@ -348,14 +322,6 @@ void Node::printAllSymbols(unsigned depth) const
 std::string Node::toString() const
 {
 	return "[" + this->tag + "] " + this->data.toString() + (this->isTopBlock ? " GLOBAL BLOCK" : "");
-}
-
-void Node::printAllEnv(unsigned depth) const
-{
-	if(this->scope != nullptr)
-		this->scope->print(depth);
-	for(auto& c : this->children)
-		c->printAllEnv(depth+1);	
 }
 
 unsigned Node::printParents() const
