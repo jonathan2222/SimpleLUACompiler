@@ -5,9 +5,9 @@
 
 std::string Symbol::toString() const
 {
-	return "(Type: " + TypeNames[this->type] + ", size: " + std::to_string(this->size) + 
-		(this->type == Type::STRING? ", s: \\'" + this->s + "\\'" : 
-			(this->type == Type::FUNCTION? ", block: " + this->funcBlock->name : "")) + ")";
+	return "(Type: " + Data::typeToString(this->data.type) + ", size: " + std::to_string(this->size) + 
+		(this->data.type == Data::Type::STRING? ", s: \\'" + this->data.s + "\\'" : 
+			(this->data.type == Data::Type::FUNCTION? ", block: " + this->funcBlock->name : "")) + ")";
 }
 
 bool Symbols::hasKey(std::string key)
@@ -18,7 +18,7 @@ bool Symbols::hasKey(std::string key)
 void Symbols::insert(std::string key, Symbol sym)
 {
 	this->map[key] = sym;
-	this->map[key].name = key;
+	this->map[key].data.name = key;
 }
 
 Symbol Symbols::get(std::string key)

@@ -21,7 +21,7 @@ public:
 	Node(const std::string& tag, const Data& data);
 	virtual ~Node();
 
-	virtual std::string makeName(const std::string& prefix = "t_");
+	virtual std::string makeName(const std::string& prefix = "_t_");
 	std::string makeId();
 	
 	void dump(int depth=0);
@@ -95,13 +95,13 @@ public:
 class Constant : public Expression
 {
 public:
-	Constant() : Expression("Constant", Data("NIL")) {}
-	Constant(bool b) : Expression("Constant", Data("Bool", b)) {}
-	Constant(double f) : Expression("Constant", Data("Number", f)) {}
-	Constant(const std::string& s) : Expression("Constant", Data("String", s)) {}
+	Constant() : Expression("Constant", Data("NO_NAME")) {}
+	Constant(bool b) : Expression("Constant", Data("NO_NAME", b)) {}
+	Constant(double f) : Expression("Constant", Data("NO_NAME", f)) {}
+	Constant(const std::string& s) : Expression("Constant", Data("NO_NAME", s)) {}
 	virtual ~Constant() {}
 
-	std::string makeName(const std::string& prefix = "t_") override;
+	std::string makeName(const std::string& prefix = "_t_") override;
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
 };
 
@@ -110,10 +110,11 @@ public:
 class Var : public Expression
 {
 public:
-	Var(const std::string& name) : Expression("Var", Data("Var", name)) { }
+	Var(const std::string& name) : Expression("Var", Data(name)) { }
 	virtual ~Var() {}
 
-	std::string makeName(const std::string& prefix = "t_") override;
+	std::string makeName(const std::string& prefix = "_t_") override;
+	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
 };
 
 // ---------------------------------------------------------------------------------------------------------
@@ -234,7 +235,7 @@ public:
 class TableIndex : public Expression
 {
 public:
-	TableIndex() : Expression("TableIndex") {}
+	TableIndex() : Expression("TableIndex", Data(Data::Type::NUMBER)) {}
 	virtual ~TableIndex() {}
 
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
@@ -245,7 +246,7 @@ public:
 class Hash : public Expression
 {
 public:
-	Hash() : Expression("Hash") {}
+	Hash() : Expression("Hash", Data(Data::Type::NUMBER)) {}
 	virtual ~Hash() {}
 
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;

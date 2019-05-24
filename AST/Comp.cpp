@@ -38,36 +38,51 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         return s.substr(0, findN(s));
     };
 
-    auto getType = [this]()->std::string {
-        if(this->type == Data::Type::NUMBER)
-            return "double ";
-        if(this->type == Data::Type::STRING)
-            return "char* ";
-        if(this->type == Data::Type::BOOL)
-            return "bool ";
-        return "double ";
+    auto toS = [](std::string s)->std::string {
+		std::string::size_type pos = 0;
+		while((pos = s.find("\n", pos)) != s.npos)
+			s.replace(pos, 2, "\\n");
+        pos = 0;
+        while((pos = s.find("\t", pos)) != s.npos)
+			s.replace(pos, 2, "\\t");
+		return s;
+    };
+
+    auto getPrefix = [&](std::string s)->std::string {
+        int p = findN(s);
+        if(p != s.size())
+        {
+            s = s.substr(p);
+            s = toS(s);
+        }
+        else s = "";
+        return s;
     };
 
     // -------------------- Arthmetic operators --------------------
 	if(this->op == "+")
 	{
-		return getType() + this->name + " = " + cut(this->lhs) + " + " + cut(this->rhs) + ";\n";
+		return this->name + " = " + cut(this->lhs) + " + " + cut(this->rhs) + ";\n";
 	}
 	else if(this->op == "-")
 	{
-		return getType() + this->name + " = " + cut(this->lhs) + " - " + cut(this->rhs) + ";\n";
+		return this->name + " = " + cut(this->lhs) + " - " + cut(this->rhs) + ";\n";
 	}
 	else if(this->op == "*")
 	{
-		return getType() + this->name + " = " + cut(this->lhs) + " * " + cut(this->rhs) + ";\n";
+		return this->name + " = " + cut(this->lhs) + " * " + cut(this->rhs) + ";\n";
 	}
 	else if(this->op == "/")
 	{
-		return getType() + this->name + " = " + cut(this->lhs) + " / " + cut(this->rhs) + ";\n";
+		return this->name + " = " + cut(this->lhs) + " / " + cut(this->rhs) + ";\n";
 	}
     else if(this->op == "^")
 	{
-		return getType() + this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
+		return this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
+	}
+    else if(this->op == "%")
+	{
+		return this->name + " = (double)((long int)" + cut(this->lhs) + "% (long int)" + cut(this->rhs) + ");\n";
 	}
     // -------------------- Comparison operators -------------------- 
 	else if(this->op == "==")
@@ -97,15 +112,15 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     // --------------------------------------------------------------------------
     else if(this->op == "cpy")
 	{
-		return getType() + this->name + " = " + cut(this->lhs) + ";\n";
+		return this->name + " = " + cut(this->lhs) + ";\n";
 	}
     else if(this->op == "storeAt")
     {
-        return this->name + "[" + cut(this->rhs) + "] = " + cut(this->lhs) + ";\n";
+        return this->name + "[(long int)" + cut(this->rhs) + "] = " + cut(this->lhs) + ";\n";
     }
     else if(this->op == "loadAt")
     {
-        return getType() + this->name + " = " + cut(this->rhs) + "[" + cut(this->lhs) + "];\n";
+        return this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + "];\n";
     }
     else if(this->op == "call") // Function call.
 	{
@@ -114,47 +129,34 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             std::string l = this->rhs;
             if(l[0] == '#') // Variable
             {
-                if(l.size() > 2 && l[1] == 't' && l[2] == '_') // Temp variable
+                if(l.size() > 2 && l[1] == '_' && l[2] == 't') // Temp variable
                 {
-                    std::string s = "";
-                    std::string l2 = l.substr(1); 
-                    int p = findN(l2);
-                    if(p != l2.size())
-                        s = s.substr(0, p);
+                    std::string l2 = getPrefix(l);
                     // Assume only floats as temp variables in printf.
-                    return "printf(\"%f" + s + "\", " + cut(l) + ");\n";
+                    return "printf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
                 }
                 else // Need to fetch from symbol table.
                 {
                     Symbol sym = symbols->get(cut(l));
-                    std::string typeStr = "f";
-                    if(sym.type == Symbol::Type::STRING)
+                    std::string typeStr = ".1lf";
+                    if(sym.data.type == Data::Type::STRING)
                         typeStr = "s";
-                    else if(sym.type == Symbol::Type::BOOL)
+                    else if(sym.data.type == Data::Type::BOOL)
                         typeStr = "d";
                     
-                    std::string s = "";
-                    std::string l2 = l.substr(1); 
-                    int p = findN(l2);
-                    if(p != l2.size())
-                        s = s.substr(0, p);
-                    
-                    return "printf(\"%" + typeStr + s + "\", " + cut(l) + ");\n";
+                    std::string l2 = getPrefix(l);
+                    return "printf(\"%" + typeStr + l2 + "\", " + cut(l) + ");\n";
                 }
             }
             else if(l[0] == '$') // Number
             {
-                std::string s = "";
-                std::string l2 = l.substr(1); 
-                int p = findN(l2);
-                if(p != l2.size())
-                    s = s.substr(0, p);
-                return "printf(\"%f" + s + "\", " + cut(l) + ");\n";
+                std::string l2 = getPrefix(l);
+                return "printf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
             } 
         }
         else if(cut(this->lhs) == "scanf")
         {
-            return getType() + this->name + ";\n\tscanf(\"%f\", " + this->name + ");\n";
+            return "scanf(\"%lf\", &" + this->name + ");\n";
         }
         else // User-created functions
         {
@@ -225,36 +227,69 @@ std::string BBlock::toTarget(Symbols* symbols)
 	return out;
 }
 
+void BBlock::fetchVars(VMap& vmap, Symbols* symbols)
+{
+    for(ThreeAd& i : this->instructions)
+    {
+        if(i.type != Data::Type::NIL && symbols->map.find(i.name) == symbols->map.end())
+        {
+            if(vmap.find(i.type) == vmap.end())
+            {
+                vmap.insert({i.type, VSet()});
+            }
+            VSet& vset = vmap[i.type];
+            vset.insert(i.name);
+        }
+    }
+}
+
+BBlock* BBlock::getLastBlock()
+{
+    BBlock* end = nullptr;
+    std::set<BBlock *> done, todo;
+    todo.insert(this);
+    while(todo.size()>0)
+    {
+        // Pop an arbitrary element from todo set
+        auto first = todo.begin();
+        BBlock *next = *first;
+        todo.erase(first);
+
+        if(next->tExit == NULL && next->fExit == NULL)
+        {
+            end = next;
+            break;
+        }
+
+        done.insert(next);
+        if(next->tExit!=NULL && done.find(next->tExit)==done.end())
+            todo.insert(next->tExit);
+
+        if(next->fExit!=NULL && done.find(next->fExit)==done.end())
+            todo.insert(next->fExit);
+    }
+    return end;
+}
+
 // ---------------------------------------------------------------------------------------------------------
 
-void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
+std::string getType(Data::Type type)
 {
-    std::ofstream file;
-    file.open("target.cc");
-    file << "#include <iostream>" << std::endl; // printf
-    file << "#include <cmath>" << std::endl;    // pow
+    if(type == Data::Type::NUMBER)
+        return "double";
+    if(type == Data::Type::STRING)
+        return "char*";
+    if(type == Data::Type::BOOL)
+        return "int";
+    return Data::typeToString(type);
+}
 
-    // Functions.
+// ---------------------------------------------------------------------------------------------------------
 
-    file << "int main()\n{\n";
+VMap fetchVars(BBlock* start)
+{
+    VMap varMap;
 
-    // Initialize the variables.
-    file << "\t// Initialize symbols." << std::endl;
-    for(auto& e : start->symbols->map)
-    {
-        Symbol& sym = e.second;
-        if(sym.type == Symbol::Type::NUMBER)
-            file << "\tdouble " << e.first << ";" << std::endl;
-        if(sym.type == Symbol::Type::STRING)
-            file << "\tchar " << e.first << "[] = \"" + sym.s + "\";" << std::endl;
-        if(sym.type == Symbol::Type::BOOL)
-            file << "\tbool " << e.first << ";" << std::endl;
-    }
-
-    file << std::endl;
-
-    // The magic.
-    bool dbg_wasT = false;
     std::set<BBlock *> done, todo;
     todo.insert(start);
     while(todo.size()>0)
@@ -264,38 +299,117 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
         BBlock *next = *first;
         todo.erase(first);
 
-        std::string code = next->toTarget(start->symbols);
+        // Fetch this block's variables.
+        next->fetchVars(varMap, start->symbols);
 
-        // Insert code block in file.
-        file << code;
-
-        if(dbg_wasT)
-        {
-            file << "// This is the false-branch of the if in the test-case\n";
-            dbg_wasT = false;
-        }
-        
-        bool dbg_hasT = false;
-        bool dbg_hasF = false;
         done.insert(next);
         if(next->tExit!=NULL && done.find(next->tExit)==done.end())
-        {
-            dbg_hasT = true;
             todo.insert(next->tExit);
-        }
-        if(next->fExit!=NULL && done.find(next->fExit)==done.end())
-        {
-            dbg_hasF = true;
-            todo.insert(next->fExit);
-        }
 
-        // Check if it was If.
-        if(dbg_hasT && dbg_hasF)
+        if(next->fExit!=NULL && done.find(next->fExit)==done.end())
+            todo.insert(next->fExit);
+    }
+
+    return varMap;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
+void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
+{
+    std::ofstream file;
+    file.open("target.c");
+    file << "#include <stdio.h>" << std::endl; // printf
+    file << "#include <math.h>" << std::endl;    // pow
+    file << std::endl;
+    // Functions.
+
+    file << "int main()\n{\n";
+
+    // Initialize the variables.
+    file << "\t// Initialize symbols." << std::endl;
+    for(auto& e : start->symbols->map)
+    {
+        Symbol& sym = e.second;
+        if(sym.data.type == Data::Type::NUMBER)
+            file << "\tdouble " << e.first << ";" << std::endl;
+        if(sym.data.type == Data::Type::STRING)
+            file << "\tchar " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
+        if(sym.data.type == Data::Type::BOOL)
+            file << "\tint " << e.first << ";" << std::endl;
+        if(sym.data.type == Data::Type::TABLE)
+            file << "\tdouble " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+    }
+    file << std::endl;
+
+    auto varTypeToFile = [&file](VMap::iterator it)->void {
+        file << "\t" << getType(it->first) << " ";
+        VSet::iterator sIt = it->second.begin();
+        for(int i = 0; sIt != it->second.end(); sIt++, i++)
+            file << (i==0? "" : ", ") << *sIt;
+        file << ";" << std::endl;
+    };
+    
+    // Initialize temp-variables.
+    file << "\t// Initialize temp-variables." << std::endl;
+    VMap vMap = fetchVars(start);
+    VMap::iterator it = vMap.begin();
+    for(;it != vMap.end(); it++)
+        varTypeToFile(it);
+    file << std::endl;
+
+    BBlock* endBlock = start->getLastBlock();
+
+    // The magic.
+    file << "\t// The code." << std::endl;
+    bool dbg_wasT = false;
+    std::set<BBlock *> done, todo;
+    todo.insert(start);
+    while(todo.size()>0)
+    {
+        // Pop an arbitrary element from todo set
+        auto first = todo.begin();
+        BBlock *next = *first;
+        todo.erase(first);
+        
+        if(next != endBlock)
         {
-            file << "// This is the true-branch of the if in the test-case\n";
-            dbg_wasT = true;
+            std::string code = next->toTarget(start->symbols);
+
+            // Insert code block in file.
+            file << code;
+
+            if(dbg_wasT)
+            {
+                file << "// This is the false-branch of the if in the test-case\n";
+                dbg_wasT = false;
+            }
+            
+            bool dbg_hasT = false;
+            bool dbg_hasF = false;
+            done.insert(next);
+            if(next->tExit!=NULL && done.find(next->tExit)==done.end())
+            {
+                dbg_hasT = true;
+                todo.insert(next->tExit);
+            }
+            if(next->fExit!=NULL && done.find(next->fExit)==done.end())
+            {
+                dbg_hasF = true;
+                todo.insert(next->fExit);
+            }
+
+            // Check if it was If.
+            if(dbg_hasT && dbg_hasF)
+            {
+                file << "// This is the true-branch of the if in the test-case\n";
+                dbg_wasT = true;
+            }
         }
     }
+
+    // Dump end block.
+    file <<  endBlock->toTarget(start->symbols);
 
     // End
     file << "\treturn 0;\n}\n";

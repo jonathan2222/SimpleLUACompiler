@@ -8,5 +8,9 @@ binary.tab.cc: binary.yy
 		bison binary.yy --report=all
 lex.yy.c: binary.ll binary.tab.cc
 		flex binary.ll
+
+target: target.c
+		gcc target.c -o target -lm && ./target
+
 clean:
-		rm -f binary.tab.* lex.yy.c* int binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.cc
+		rm -f binary.tab.* lex.yy.c* int binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.c

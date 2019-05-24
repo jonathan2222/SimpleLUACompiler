@@ -67,8 +67,8 @@ std::string Node::dot()
 {
 	std::string s = this->id + " [color=white, fontcolor=white, label=\"" + 
 			this->tag + 
-			(this->data.type!=Data::EMPTY?": " + 
-			this->data.valToString(this->data.type):"") +  
+			(this->data.type!=Data::EMPTY?": " + (this->data.name=="NO_NAME"? 
+			this->data.valToString(this->data.type): this->data.name) : "" ) +  
 			"\"];\n";
 	for(auto i=this->children.begin(); i!=this->children.end(); i++)
 	{
@@ -115,7 +115,7 @@ void Node::symbolsTocfg(std::ofstream& file, Node* node)
 			std::stringstream ss;
 			std::string name = "SYM_" + std::to_string(symbolID) + "_" + e.first;  
 			ss << "\t\t" << name << " [color=white, fontcolor=white, label=\"";
-			ss << s.name << ": " << s.toString() << "\"];" << std::endl;
+			ss << s.data.name << ": " << s.toString() << "\"];" << std::endl;
 			
 			if(pre.empty() == false)
 				ss << "\t\t" << pre << " -> " << name << ";" << std::endl;
@@ -196,7 +196,10 @@ std::pair<BBlock*, std::string> Node::convert(BBlock* out)
 {
 	std::pair<BBlock*, std::string> result(out, "");
 	for(Node* c : this->children)
+	{
 		result = c->convert(result.first);
+		this->name = result.first->name;
+	}
 	return result;
 }
 
@@ -375,15 +378,16 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 	// If the constant is a string => make a symbol for it.
 	if(data.type == Data::Type::STRING)
 	{
-		::Expression::makeName("s_");
-		Symbol sym(Symbol::Type::STRING);
+		::Expression::makeName("_s_");
+		Symbol sym(Data::Type::STRING);
 		sym.size = (this->data.s.size()+1)*sizeof(char);
-		sym.s = this->data.s;
+		sym.data.s = this->data.s;
 		addSymbol(this->name, sym);
 	}
 	else
 		makeName();
 
+	data.name = this->name;
 	result.second = this->name;
 	return result;
 }
@@ -392,8 +396,20 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 
 std::string Var::makeName(const std::string& prefix)
 {
-	this->name = data.valToString();
+	this->name = data.name;
 	return this->name;
+}
+
+std::pair<BBlock*, std::string> Var::convert(BBlock* out)
+{
+	makeName();
+	std::pair<BBlock*, std::string> result(nullptr, this->name);
+	if(hasSymbol(this->name) != false)
+	{
+		Symbol sym = getSymbol(this->name);
+		this->data.type = sym.data.type;
+	}
+	return result;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -422,6 +438,7 @@ std::pair<BBlock*, std::string> Operation::convert(BBlock* out)
 	std::pair<BBlock*, std::string> result(out, this->name);
 	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, Data::Type::NUMBER));
 
+	data.name = this->name;
 	return result;
 }
 
@@ -444,7 +461,7 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		if(hasSymbol(lhs->name) == false)
 		{
 			// If not allocate it in .data
-			Symbol sym(Symbol::ARRAY);
+			Symbol sym(Data::Type::TABLE);
 			sym.size = table->arr.size()*sizeof(double); // Size of array in bytes.
 			addSymbol(this->name, sym); // All symbols have allocated space in .data
 		}
@@ -452,6 +469,7 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		// Insert elements into the allocated space.
 		Symbol sym = getSymbol(lhs->name);
 		table->convert(out, sym);
+		this->data.type = Data::Type::TABLE;
 	}
 	else if(lhs->tag == "TableIndex")
 	{
@@ -461,23 +479,25 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		Node* cIndex = lhs->children.back();
 		cIndex->convert(out);
 		std::string tblIndexVarI = cIndex->name;
+		this->data.type = Data::Type::TABLE;
 		result.first->instructions.push_back(ThreeAd(tblIndexVar, "storeAt", rhs->name, tblIndexVarI, Data::Type::TABLE));
 	}
 	else
 	{
 		lhs->convert(out);
 		this->name = lhs->name;
+		this->data.type = rhs->data.type;
 
 		Symbol sym;
 		switch (rhs->data.type)
 		{
 		case Data::Type::NUMBER:
-			sym.type = Symbol::Type::NUMBER;
+			sym.data.type = Data::Type::NUMBER;
 			sym.size = sizeof(double);
 			break;
 		case Data::Type::STRING:
 			{
-				sym.type = Symbol::Type::STRING;
+				sym.data.type = Data::Type::STRING;
 				Symbol sym2;
 				if(hasSymbol(rhs->name))
 					sym2 = getSymbol(rhs->name);
@@ -487,8 +507,18 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 			}
 			break;
 		case Data::Type::BOOL:
-			sym.type = Symbol::Type::BOOL;
+			sym.data.type = Data::Type::BOOL;
 			sym.size = 1; // Only one byte is needed.
+			break;
+		case Data::Type::FUNCTIONCALL:
+			{
+				if(rhs->ret.type != Data::Type::EMPTY)
+				{
+					this->data.type = rhs->ret.type;
+					sym.data.type = this->data.type;
+					sym.size = sizeof(double); // Assume Number.
+				}
+			}
 			break;
 		default:
 			break;
@@ -500,7 +530,6 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 	// Transfere type.
 	if(this->name == "itemCount")
 		std::cout << rhs->data.toStringEx() << std::endl;
-	this->data.type = rhs->data.type;
 	return result;
 }
 
@@ -691,15 +720,6 @@ std::pair<BBlock*, std::string> Repeat::convert(BBlock* out)
 
 std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 {
-	/*
-	auto strCut = [](const std::string& str)->std::string {
-		std::string copy(str);
-		std::string::size_type pos = 0;
-		while((pos = copy.find("\\n", pos)) != copy.npos)
-			copy.replace(pos, 2, "\n");
-		return copy;
-	};*/
-
 	bool isPredefined = false;
 
 	Var* lhs = dynamic_cast<Var*>(this->children.front());
@@ -895,7 +915,7 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 	for(double d : this->arr)
 	{
 		// Insert d into sym at position index.
-		out->instructions.push_back(ThreeAd(sym.name, "storeAt", std::to_string(d), std::to_string(index), Data::Type::TABLE));
+		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", std::to_string(d), std::to_string(index), Data::Type::TABLE));
 		index += 1; // TODO: Change this when using asm. 
 	}
 	return result;
@@ -959,7 +979,7 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 		BBlock* funcBlock = new BBlock();
 		topNode->functions.push_back(funcBlock);
 
-		Symbol sym(Symbol::Type::FUNCTION);
+		Symbol sym(Data::Type::FUNCTION);
 		// TODO: Change this. This will not work!
 		//funcBlock->symbols = new Symbols(nullptr);
 		sym.funcBlock = funcBlock; // Every instance of the function, has its own cfg.
@@ -980,14 +1000,14 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 			while(c->children.empty() == false)
 			{
 				c->convert(funcBlock);
-				Symbol sym(Symbol::Type::NUMBER);
+				Symbol sym(Data::Type::NUMBER);
 				sym.size = 0;
 				addSymbol(c->name, sym);
 				//funcBlock->symbols->insert(c->name, sym);
 				c = c->children.front();
 			}
 			c->convert(funcBlock);
-			Symbol sym(Symbol::Type::NUMBER);
+			Symbol sym(Data::Type::NUMBER);
 			sym.size = 0;
 			addSymbol(c->name, sym);
 		}

@@ -8,7 +8,11 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 #include "Data.hh"
+
+#define VSet std::set<std::string>
+#define VMap std::unordered_map<Data::Type, VSet>
 
 /************* Three Address Instructions *************/
 class Symbols;
@@ -48,7 +52,15 @@ public:
 
     std::string toTarget(Symbols* symbols);
     Symbols* symbols = nullptr;
+
+    void fetchVars(VMap& vmap, Symbols* symbols);
+
+    BBlock* getLastBlock();
 };
+
+std::string getType(Data::Type type);
+
+VMap fetchVars(BBlock* start);
 
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks);
 

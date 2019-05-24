@@ -10,17 +10,17 @@ public:
 	static std::string TypeNames[Type::MAX2];
 
 	// Empty data, no name, no type.
-	Data() : type(Type::EMPTY) { makeName("Empty"); }
+	Data() : type(Type::EMPTY), name("NO_NAME") { }
 	// Type data.
-	Data(Type type) : type(type) { makeName(TypeNames[this->type]); }
+	Data(Type type) : type(type), name("NO_NAME") { }
 	// Nil data.
-	Data(const std::string& name) { makeName(name); setNil(); }
+	Data(const std::string& name) : name(name) { setNil(); }
 	// Number data.
-	Data(const std::string& name, double f) { makeName(name); setVal(f); }
+	Data(const std::string& name, double f) : name(name) { setVal(f); }
 	// Boolean data.
-	Data(const std::string& name, bool b) { makeName(name); setVal(b); }
+	Data(const std::string& name, bool b) : name(name) { setVal(b); }
 	// String data.
-	Data(const std::string& name, const std::string& s) {makeName(name); setVal(s); }
+	Data(const std::string& name, const std::string& s) : name(name) { setVal(s); }
 
 	void setVal(const Data& data);
 	void setVal(double f);
@@ -28,17 +28,13 @@ public:
 	void setVal(const std::string& s);
 	void setNil();
 
-	bool hasEnvironment() const;
-
 	// -------- Debug --------
 	std::string toString() const;
 	std::string toStringEx() const;
 	std::string valToString(Type type = Type::MAX) const;
-	std::string typeToString() const;
+	static std::string typeToString(Data::Type type);
 	// -----------------------
 
-	void makeName(const std::string& name);
-	
 	Type type = Type::EMPTY;
 	double f;
 	bool b;

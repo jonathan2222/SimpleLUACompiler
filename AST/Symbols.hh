@@ -3,21 +3,18 @@
 
 #include <unordered_map>
 #include <string>
+#include "Data.hh"
 
 class BBlock;
 struct Symbol
 {
-	enum Type { ARRAY, NUMBER, STRING, BOOL, FUNCTION, NONE };
-	std::string TypeNames[6] = {"ARRAY", "NUMBER", "STRING", "BOOL", "FUNCTION", "NONE"};
 	Symbol() {}
-	Symbol(Type type) : type(type) {}
+	Symbol(Data::Type type) { data.type = type; }
 	unsigned int size = 0;
 
 	std::string toString() const;
 
-	Type type = NONE;
-	std::string name;
-	std::string s;
+	Data data;
 	BBlock* funcBlock = nullptr;
 };
 

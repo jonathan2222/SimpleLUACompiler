@@ -55,11 +55,6 @@ void Data::setNil()
 	this->type = Type::NIL;
 }
 
-bool Data::hasEnvironment() const
-{
-	return this->type == Type::SCOPE || this->type == Type::TABLE || this->type == Type::FUNCTION;
-}
-
 std::string Data::toString() const
 {
 	return "(" + this->name + ") Type: " + TypeNames[this->type] + ", val: " + valToString(this->type);
@@ -84,7 +79,7 @@ std::string Data::valToString(Type type) const
 		}
 		break;
 	case Type::BOOL:
-		return this->b ? "True" : "False";
+		return this->b ? "1" : "0";
 		break;
 	case Type::STRING:
 		return this->s;
@@ -98,12 +93,7 @@ std::string Data::valToString(Type type) const
 	}
 }
 
-std::string Data::typeToString() const
+std::string Data::typeToString(Data::Type type)
 {
-	return TypeNames[this->type];
-}
-
-void Data::makeName(const std::string& name)
-{
-	this->name = std::to_string(++counter) + "_" + name;
+	return TypeNames[type];
 }

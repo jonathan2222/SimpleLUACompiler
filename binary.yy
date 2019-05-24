@@ -371,7 +371,7 @@ field:
 									}
 	| NAME "=" exp					{ 
 										$$ = new Node("TBE_name_exp");
-										$$->addChild(new Node("Name", Data("Name", $1)));
+										$$->addChild(new Node("Name", Data($1, $1)));
 										$$->addChild($3);
 									}
 	| exp							{
