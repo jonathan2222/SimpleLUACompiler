@@ -972,7 +972,7 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 {
 	std::pair<BBlock*, std::string> result(out, this->name);
 
-	unsigned int index = 0;
+	unsigned int index = 1;
 	for(double d : this->arr)
 	{
 		// Insert d into sym at position index.
