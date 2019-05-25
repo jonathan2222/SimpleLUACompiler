@@ -118,11 +118,11 @@ std::string ThreeAd::toTarget(Symbols* symbols)
 	}
     else if(this->op == "storeAt")
     {
-        return this->name + "[(long int)" + cut(this->rhs) + "] = " + cut(this->lhs) + ";\n";
+        return this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
     }
     else if(this->op == "loadAt")
     {
-        return this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + "];\n";
+        return this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
     }
     else if(this->op == "call") // Function call.
 	{
