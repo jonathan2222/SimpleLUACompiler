@@ -8,6 +8,8 @@
 
 #define min(a, b) (a<b?a:b)
 
+CompileLevel compLevel;
+
 void ThreeAd::dump()
 {
 	std::cout << name << " := ";
@@ -35,7 +37,12 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     };
 
     auto cut = [&](std::string s)->std::string {
-        if(s[0] == '$') s = s.substr(1);
+        if(s[0] == '$') 
+        {
+            s = s.substr(1);
+            if(s.find('.') == s.npos)
+                s += ".0"; 
+        }
         if(s[0] == '#') s = s.substr(1);
         return s.substr(0, findN(s));
     };
@@ -64,65 +71,176 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     // -------------------- Arthmetic operators --------------------
 	if(this->op == "+")
 	{
-		return this->name + " = " + cut(this->lhs) + " + " + cut(this->rhs) + ";\n";
+        if(compLevel == CompileLevel::E)
+		    return "\t" + this->name + " = " + cut(this->lhs) + " + " + cut(this->rhs) + ";\n";
+        else if(compLevel == CompileLevel::D)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " + " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
+            s += "\t\t\"addsd %%xmm0, %%xmm1\\n\"\n";
+            s += "\t\t\"movsd %%xmm1, %[" + this->name + "]\\n\"\n";
+
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [a] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [b] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;    
+        }
 	}
 	else if(this->op == "-")
 	{
-		return this->name + " = " + cut(this->lhs) + " - " + cut(this->rhs) + ";\n";
+        if(compLevel == CompileLevel::E)
+		    return "\t" + this->name + " = " + cut(this->lhs) + " - " + cut(this->rhs) + ";\n";
+        else if(compLevel == CompileLevel::D)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " - " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
+            s += "\t\t\"subsd %%xmm1, %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [a] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [b] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;    
+        }
 	}
 	else if(this->op == "*")
 	{
-		return this->name + " = " + cut(this->lhs) + " * " + cut(this->rhs) + ";\n";
+        if(compLevel == CompileLevel::E)
+		    return "\t" + this->name + " = " + cut(this->lhs) + " * " + cut(this->rhs) + ";\n";
+        else if(compLevel == CompileLevel::D)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " * " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
+            s += "\t\t\"mulsd %%xmm1, %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [a] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [b] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;    
+        }
 	}
 	else if(this->op == "/")
 	{
-		return this->name + " = " + cut(this->lhs) + " / " + cut(this->rhs) + ";\n";
+        if(compLevel == CompileLevel::E)
+		    return "\t" + this->name + " = " + cut(this->lhs) + " / " + cut(this->rhs) + ";\n";
+        else if(compLevel == CompileLevel::D)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " / " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
+            s += "\t\t\"divsd %%xmm1, %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [a] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [b] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;    
+        }
 	}
     else if(this->op == "^")
 	{
-		return this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
+		return "\t" + this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
 	}
     else if(this->op == "%")
 	{
-		return this->name + " = (double)((long int)" + cut(this->lhs) + "% (long int)" + cut(this->rhs) + ");\n";
+        if(compLevel == CompileLevel::E)
+		    return "\t" + this->name + " = (double)((long int)" + cut(this->lhs) + "% (long int)" + cut(this->rhs) + ");\n";
+        else if(compLevel == CompileLevel::D)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " % " + this->rhs + " -> " + 
+                this->name + " := " + this->lhs + " - " + this->rhs + " * (long int)(" + this->lhs + " / " + this->rhs + ")\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";     
+            s += "\t\t\"movsd %%xmm0, %%xmm2\\n\"\n";   
+            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\"\n";       // xmm2 = xmm0 / xmm1
+            s += "\t\t\"cvttsd2siq %%xmm2, %%rax\\n\"\n";   // rax = (long int)xmm2
+            s += "\t\t\"cvtsi2sdq %%rax, %%xmm2\\n\"\n";    // xmm2 = rax
+            s += "\t\t\"mulsd %%xmm1, %%xmm2\\n\"\n";       // xmm2 = xmm1 * xmm2
+            s += "\t\t\"subsd %%xmm2, %%xmm0\\n\"\n";       // xmm0 = xmm0 - xmm2
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [a] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [b] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"%xmm2\", \"%rax\", \"cc\"\n";
+            s += "\t);\n";
+            return s;    
+        }
 	}
     // -------------------- Comparison operators -------------------- 
 	else if(this->op == "==")
 	{
-		return "if(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "~=")
 	{
-		return "if(" + cut(this->lhs) + " != " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " != " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "<=")
 	{
-		return "if(" + cut(this->lhs) + " <= " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " <= " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == ">=")
 	{
-		return "if(" + cut(this->lhs) + " >= " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " >= " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "<")
 	{
-		return "if(" + cut(this->lhs) + " < " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " < " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == ">")
 	{
-		return "if(" + cut(this->lhs) + " > " + cut(this->rhs) + ")\n";
+		return "\tif(" + cut(this->lhs) + " > " + cut(this->rhs) + ")\n";
 	}
     // --------------------------------------------------------------------------
     else if(this->op == "cpy")
 	{
-		return this->name + " = " + cut(this->lhs) + ";\n";
+		return "\t" + this->name + " = " + cut(this->lhs) + ";\n";
 	}
     else if(this->op == "storeAt")
     {
-        return this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
+        return "\t" + this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
     }
     else if(this->op == "loadAt")
     {
-        return this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
+        return "\t" + this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
     }
     else if(this->op == "call") // Function call.
 	{
@@ -135,7 +253,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 {
                     std::string l2 = getPrefix(l);
                     // Assume only floats as temp variables in printf.
-                    return "printf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
+                    return "\tprintf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
                 }
                 else // Need to fetch from symbol table.
                 {
@@ -147,34 +265,34 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                         typeStr = "d";
                     
                     std::string l2 = getPrefix(l);
-                    return "printf(\"%" + typeStr + l2 + "\", " + cut(l) + ");\n";
+                    return "\tprintf(\"%" + typeStr + l2 + "\", " + cut(l) + ");\n";
                 }
             }
             else if(l[0] == '$') // Number
             {
                 std::string l2 = getPrefix(l);
-                return "printf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
+                return "\tprintf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
             } 
         }
         else if(cut(this->lhs) == "scanf")
         {
-            return "scanf(\"%lf\", &" + this->name + ");\n";
+            return "\tscanf(\"%lf\", &" + this->name + ");\n";
         }
         else // User-created functions
         {
             if(this->rhs == "NIL")
-                return this->lhs + "();\n";
+                return "\t" + this->lhs + "();\n";
             else
-                return this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
+                return "\t" + this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
         }
     }
     else if(this->op == "ret")
     {
         if(cut(this->lhs) == "NIL")
-            return "return;\n";
+            return "\treturn;\n";
         else
         {
-            return "return " + cut(this->lhs) + ";\n";
+            return "\treturn " + cut(this->lhs) + ";\n";
         }
         
     }
@@ -213,20 +331,24 @@ std::string BBlock::toTarget(Symbols* symbols)
 	out += this->name + ":\n";
 	
     for(auto i : this->instructions)
-        out += "\t" + i.toTarget(symbols);
+        out += i.toTarget(symbols);
 
 	// If it can branch to two blocks.
 	if(this->tExit && this->fExit)
 	{
-		out += "\t\tgoto " + this->tExit->name + ";\n";
-		out += "\telse\n";
-		out += "\t\tgoto " + this->fExit->name + ";\n";
-	}
+        if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+        {
+            out += "\t\tgoto " + this->tExit->name + ";\n";
+            out += "\telse\n";
+            out += "\t\tgoto " + this->fExit->name + ";\n";
+        }
+    }
 
 	// If it can only flow to one block.
 	if(this->tExit && !this->fExit)
 	{
-		out += "\tgoto " + this->tExit->name + ";\n";
+        if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+		    out += "\tgoto " + this->tExit->name + ";\n";
 	}
 
 	out += "\t// End of block.\n";
@@ -456,7 +578,10 @@ std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::ve
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
 {
     std::ofstream file;
-    file.open("target.c");
+    std::string fileName = "target.cc";
+    if(compLevel == CompileLevel::D || compLevel == CompileLevel::C) 
+        fileName = "target.c";
+    file.open(fileName);
     file << "#include <stdio.h>" << std::endl;   // printf
     file << "#include <math.h>" << std::endl;    // pow
     file << std::endl;

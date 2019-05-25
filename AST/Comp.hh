@@ -15,6 +15,8 @@
 #define VSet std::set<std::string>
 #define VMap std::unordered_map<Data::Type, VSet, Data::TypeHash>
 
+enum CompileLevel { E, D, C, B, A };
+
 /************* Three Address Instructions *************/
 class Symbols;
 class ThreeAd

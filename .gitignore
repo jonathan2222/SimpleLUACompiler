@@ -2,6 +2,7 @@
 .vscode/
 
 # Don't track these files
+target.cc
 target.c
 target
 comp
