@@ -448,9 +448,72 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 {
 	std::pair<BBlock*, std::string> result(out, "");
 
-	Expression* lhs = dynamic_cast<Expression*>(this->children.front()->children.front());
-	Expression* rhs = dynamic_cast<Expression*>(this->children.back()->children.front());
-	rhs->convert(out);
+	Node* var_list = this->children.front();
+	Node* exp_list = this->children.back();
+
+	auto vIt = var_list->children.begin();
+	auto eIt = exp_list->children.begin();
+
+	for(;vIt != var_list->children.end(); vIt++, eIt++)
+	{
+		Expression* lhs = dynamic_cast<Expression*>(*vIt);
+		Expression* rhs = dynamic_cast<Expression*>(*eIt);
+		if(rhs->tag == "Table")
+		{
+			AssignmentOne* as = new AssignmentOne();
+			rhs->convert(out);
+			as->addChild(lhs);
+			as->addChild(rhs);
+			as->parent = this;
+			as->convert(out, true);
+		}
+		else
+		{
+			// Make a assignment for each 'part'
+			AssignmentOne* as = new AssignmentOne();
+			Var* v = new Var("_tmp" + lhs->name);
+			v->makeName();
+			as->addChild(v);
+			rhs->convert(out);
+			as->addChild(rhs);
+			as->parent = this;
+			as->convert(out, false);
+		}
+	}
+
+	vIt = var_list->children.begin();
+	eIt = exp_list->children.begin();
+	for(; vIt != var_list->children.end(); vIt++, eIt++)
+	{
+		Expression* lhs = dynamic_cast<Expression*>(*vIt);
+		Expression* rhs = dynamic_cast<Expression*>(*eIt);
+		if(rhs->tag != "Table")
+		{
+			AssignmentOne* as = new AssignmentOne();
+			as->addChild(lhs);
+			Var* e = new Var("_tmp" + lhs->name);
+			e->makeName();
+			e->convert(out);
+			e->data.type = rhs->data.type;
+			e->ret = rhs->ret;
+			as->addChild(e);
+			as->parent = this;
+			as->convert(out, true);
+		}
+	}
+	
+	return result;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
+std::pair<BBlock*, std::string> AssignmentOne::convert(BBlock* out, bool shouldAddSym)
+{
+	std::pair<BBlock*, std::string> result(out, "");
+
+	Expression* lhs = dynamic_cast<Expression*>(this->children.front());
+	Expression* rhs = dynamic_cast<Expression*>(this->children.back());
+	//rhs->convert(out);
 
 	if(rhs->tag == "Table")
 	{
@@ -523,13 +586,11 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		default:
 			break;
 		}
-		addSymbol(this->name, sym);
-		result.first->instructions.push_back(ThreeAd(this->name, "cpy", rhs->name, rhs->name, rhs->data.type));	
-	}
+		if(shouldAddSym)
+			addSymbol(this->name, sym);
+		result.first->instructions.push_back(ThreeAd(this->name, "cpy", rhs->name, rhs->name, this->data.type));	
+	}	
 	
-	// Transfere type.
-	if(this->name == "itemCount")
-		std::cout << rhs->data.toStringEx() << std::endl;
 	return result;
 }
 
@@ -617,20 +678,18 @@ std::pair<BBlock*, std::string> For::convert(BBlock* out)
 	// var
 	Node*& varN = *(itFor++);
 
-	// Create assignment node. To assign var to NAME.
-	Assignment* as = new Assignment();
-	Node* varList = new Node("Var_list");
-	varList->addChild(nVarN);
-	as->addChild(varList);
-	Node* expList = new Node("Exp_list");
-	expList->addChild(varN);
-	as->addChild(expList);
-	as->parent = this;
-
 	BBlock* forBlock = new BBlock();
 	out->tExit = forBlock;
+
+	// Create assignment node. To assign var to NAME.
+	AssignmentOne* as = new AssignmentOne();
+	as->addChild(nVarN);
+	varN->convert(forBlock);
+	as->addChild(varN);
+	as->parent = this;
+
 	// Assignment only fills the forBlock with instructions.
-	as->convert(forBlock).first;
+	as->convert(forBlock, true).first;
 
 	// Limit
 	Node*& limitN = *(itFor++);
@@ -816,7 +875,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 							if(n->data.type == Data::Type::NUMBER)
 								s = s.substr(1);
 						}
-						
+
 						out->instructions.push_back(ThreeAd(this->name, "call", "printf", s, Data::Type::NIL));
 						this->ret.type = Data::Type::NIL;
 					}
@@ -1003,14 +1062,20 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 				Symbol sym(Data::Type::NUMBER);
 				sym.size = 0;
 				addSymbol(c->name, sym);
-				//funcBlock->symbols->insert(c->name, sym);
+				sym.data.name = c->name;
+				funcBlock->funcArgs.push_back(sym);
 				c = c->children.front();
 			}
 			c->convert(funcBlock);
 			Symbol sym(Data::Type::NUMBER);
 			sym.size = 0;
 			addSymbol(c->name, sym);
+			sym.data.name = c->name;
+			funcBlock->funcArgs.push_back(sym);
+
 		}
+		// Assume return type as Number.
+		this->ret.type = Data::Type::NUMBER;
 
 		block->convert(funcBlock);
 		

@@ -1,2 +1,3 @@
-x = 10
-print(x)
+for i = 1,5 do
+	x = i
+end

@@ -1,8 +1,10 @@
 #include "Comp.hh"
 
+#include <algorithm>
 #include <sstream>
 #include "Symbols.hh"
 #include "Data.hh"
+#include "AST.hh"
 
 #define min(a, b) (a<b?a:b)
 
@@ -313,35 +315,32 @@ VMap fetchVars(BBlock* start)
     return varMap;
 }
 
-// ---------------------------------------------------------------------------------------------------------
-
-void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
+void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude)
 {
-    std::ofstream file;
-    file.open("target.c");
-    file << "#include <stdio.h>" << std::endl; // printf
-    file << "#include <math.h>" << std::endl;    // pow
-    file << std::endl;
-    // Functions.
-
-    file << "int main()\n{\n";
-
-    // Initialize the variables.
     file << "\t// Initialize symbols." << std::endl;
     for(auto& e : start->symbols->map)
     {
         Symbol& sym = e.second;
-        if(sym.data.type == Data::Type::NUMBER)
-            file << "\tdouble " << e.first << ";" << std::endl;
-        if(sym.data.type == Data::Type::STRING)
-            file << "\tchar " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
-        if(sym.data.type == Data::Type::BOOL)
-            file << "\tint " << e.first << ";" << std::endl;
-        if(sym.data.type == Data::Type::TABLE)
-            file << "\tdouble " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+        std::vector<Symbol>::iterator it = std::find(exclude.begin(), exclude.end(), sym);
+        if(it == exclude.end())
+        {
+            if(sym.data.type == Data::Type::NUMBER)
+                file << "\tdouble " << e.first << ";" << std::endl;
+            if(sym.data.type == Data::Type::STRING)
+                file << "\tchar " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
+            if(sym.data.type == Data::Type::BOOL)
+                file << "\tint " << e.first << ";" << std::endl;
+            if(sym.data.type == Data::Type::TABLE)
+                file << "\tdouble " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+        }
     }
     file << std::endl;
+}
 
+// ---------------------------------------------------------------------------------------------------------
+
+void initTmpVariables(std::ofstream& file, BBlock* start)
+{
     auto varTypeToFile = [&file](VMap::iterator it)->void {
         file << "\t" << getType(it->first) << " ";
         VSet::iterator sIt = it->second.begin();
@@ -350,17 +349,21 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
         file << ";" << std::endl;
     };
     
-    // Initialize temp-variables.
     file << "\t// Initialize temp-variables." << std::endl;
     VMap vMap = fetchVars(start);
     VMap::iterator it = vMap.begin();
     for(;it != vMap.end(); it++)
         varTypeToFile(it);
     file << std::endl;
+}
 
+// ---------------------------------------------------------------------------------------------------------
+
+void dumpCFG(std::ofstream& file, BBlock* start)
+{
     BBlock* endBlock = start->getLastBlock();
 
-    // The magic.
+    // The dump each block of code.
     file << "\t// The code." << std::endl;
     bool dbg_wasT = false;
     std::set<BBlock *> done, todo;
@@ -410,8 +413,65 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
 
     // Dump end block.
     file <<  endBlock->toTarget(start->symbols);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
+std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::vector<BBlock*>& functionBlocks)
+{
+    std::vector<std::pair<Symbol, BBlock*>> functionMap;
+
+    for(auto s : symbols->map)
+    {
+        std::vector<BBlock*>::iterator it = std::find(functionBlocks.begin(), functionBlocks.end(), s.second.funcBlock);
+        if(it != functionBlocks.end())
+            functionMap.push_back({s.second, *it});
+    }
+
+    return functionMap;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
+void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
+{
+    std::ofstream file;
+    file.open("target.c");
+    file << "#include <stdio.h>" << std::endl; // printf
+    file << "#include <math.h>" << std::endl;    // pow
+    file << std::endl;
+    
+    // Functions.
+    std::vector<std::pair<Symbol, BBlock*>> functionMap = getFunctionMap(start->symbols, funcBlocks);
+    for(auto f : functionMap)
+    {
+        Symbol fArgs1 = f.second->funcArgs[0];
+        file << "double " << f.first.data.name << "("<< getType(fArgs1.data.type) << " " << fArgs1.data.name << ")\n{" << std::endl;
+        // Initialize the variables.
+        initVariables(file, f.second, f.second->funcArgs);
+
+        // Initialize temp-variables.
+        initTmpVariables(file, f.second);
+
+        // Dump all block in the CFG.
+        dumpCFG(file, f.second);
+
+        file << "}" << std::endl << std::endl; 
+    }
+
+    file << "int main()\n{\n";
+
+    // Initialize the variables.
+    initVariables(file, start);
+
+    // Initialize temp-variables.
+    initTmpVariables(file, start);
+
+    // Dump all block in the CFG.
+    dumpCFG(file, start);
 
     // End
     file << "\treturn 0;\n}\n";
+
     file.close();
 }

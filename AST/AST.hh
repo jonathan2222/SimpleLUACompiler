@@ -175,6 +175,17 @@ public:
 
 // ---------------------------------------------------------------------------------------------------------
 
+class AssignmentOne : public Statement
+{
+public:
+	AssignmentOne() : Statement("AssignmentOne") {}
+	virtual ~AssignmentOne() {}
+
+	virtual std::pair<BBlock*, std::string> convert(BBlock* out, bool shouldAddSym);
+};
+
+// ---------------------------------------------------------------------------------------------------------
+
 class If : public Statement
 {
 public:

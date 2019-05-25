@@ -10,6 +10,7 @@
 #include <vector>
 #include <unordered_map>
 #include "Data.hh"
+#include "Symbols.hh"
 
 #define VSet std::set<std::string>
 #define VMap std::unordered_map<Data::Type, VSet>
@@ -39,6 +40,7 @@ class BBlock
 private:
     static int nCounter;
 public:
+    std::vector<Symbol> funcArgs;
     std::list<ThreeAd> instructions;
     BBlock *tExit, *fExit;
     std::string name;
@@ -61,6 +63,11 @@ public:
 std::string getType(Data::Type type);
 
 VMap fetchVars(BBlock* start);
+
+void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude = std::vector<Symbol>());
+void initTmpVariables(std::ofstream& file, BBlock* start);
+void dumpCFG(std::ofstream& file, BBlock* start);
+std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::vector<BBlock*>& functionBlocks);
 
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks);
 

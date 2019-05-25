@@ -14,6 +14,8 @@ struct Symbol
 
 	std::string toString() const;
 
+	bool operator==(const Symbol& other) const;
+
 	Data data;
 	BBlock* funcBlock = nullptr;
 };

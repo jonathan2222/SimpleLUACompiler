@@ -10,6 +10,11 @@ std::string Symbol::toString() const
 			(this->data.type == Data::Type::FUNCTION? ", block: " + this->funcBlock->name : "")) + ")";
 }
 
+bool Symbol::operator==(const Symbol& other) const
+{
+	return this->data.name == other.data.name;
+}
+
 bool Symbols::hasKey(std::string key)
 {
 	return this->map.find(key) != this->map.end();
