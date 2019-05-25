@@ -1,7 +1,7 @@
 FILES = binary.tab.o lex.yy.c main.cc AST/AST.cpp AST/Data.cpp AST/Comp.cpp AST/Symbols.cpp
 
 parser: $(FILES)
-		g++ -std=c++11 -g -o int $(FILES)
+		g++ -std=c++11 -g -o comp $(FILES)
 binary.tab.o: binary.tab.cc
 		g++ -std=c++11 -g -c binary.tab.cc
 binary.tab.cc: binary.yy
@@ -13,4 +13,4 @@ target: target.c
 		gcc target.c -o target -lm && ./target
 
 clean:
-		rm -f binary.tab.* lex.yy.c* int binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.c
+		rm -f binary.tab.* lex.yy.c* comp binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.c

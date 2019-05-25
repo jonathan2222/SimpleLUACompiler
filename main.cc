@@ -37,10 +37,10 @@ int main(int argc, char **argv)
         root->compressSymbols();
         root->toCfg(start);
         
-        printf("----------------------------------------------------------------\n");
-        root->printAllSymbols();
+        //printf("----------------------------------------------------------------\n");
+        //root->printAllSymbols();
 
-        printf("----------------------------------------------------------------\n");
+        //printf("----------------------------------------------------------------\n");
         dumpToTarget(start, root->functions);
         
         delete start;
