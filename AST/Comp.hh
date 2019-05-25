@@ -55,6 +55,7 @@ public:
     std::string toTarget(Symbols* symbols);
     Symbols* symbols = nullptr;
 
+    bool hasReturn() const;
     void fetchVars(VMap& vmap, Symbols* symbols);
 
     BBlock* getLastBlock();
@@ -66,7 +67,7 @@ VMap fetchVars(BBlock* start);
 
 void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude = std::vector<Symbol>());
 void initTmpVariables(std::ofstream& file, BBlock* start);
-void dumpCFG(std::ofstream& file, BBlock* start);
+void dumpCFGInstructions(std::ofstream& file, BBlock* start);
 std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::vector<BBlock*>& functionBlocks);
 
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks);

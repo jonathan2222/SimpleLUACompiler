@@ -644,7 +644,8 @@ std::pair<BBlock*, std::string> If::convert(BBlock* out)
 	out->tExit = tIn;
 
 	BBlock* end = new BBlock();
-	tOut->tExit = end;
+	if(!tOut->hasReturn())
+		tOut->tExit = end;
 
 	// Check if elseif
 	if(itIf != this->children.end())
@@ -653,7 +654,8 @@ std::pair<BBlock*, std::string> If::convert(BBlock* out)
 		BBlock* fIn = new BBlock();
 		BBlock* fOut = fl->convert(fIn).first;
 		out->fExit = fIn;
-		fOut->tExit = end;
+		if(!fOut->hasReturn())
+			fOut->tExit = end;
 	}
 	else
 	{

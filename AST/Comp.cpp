@@ -165,8 +165,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             if(this->rhs == "NIL")
                 return this->lhs + "();\n";
             else
-                return this->lhs + "(" + cut(this->rhs) + ");\n";
+                return this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
         }
+    }
+    else if(this->op == "ret")
+    {
+        if(cut(this->lhs) == "NIL")
+            return "return;\n";
+        else
+        {
+            return "return " + cut(this->lhs) + ";\n";
+        }
+        
     }
 }
 
@@ -229,11 +239,20 @@ std::string BBlock::toTarget(Symbols* symbols)
 	return out;
 }
 
+bool BBlock::hasReturn() const
+{
+    // Return ture if a return operator was found.
+    for(ThreeAd i : this->instructions)
+        if(i.op == "ret")
+            return true;
+    return false;
+}
+
 void BBlock::fetchVars(VMap& vmap, Symbols* symbols)
 {
     for(ThreeAd& i : this->instructions)
     {
-        if(i.type != Data::Type::NIL && symbols->map.find(i.name) == symbols->map.end())
+        if(i.type != Data::Type::NIL && symbols->map.find(i.name) == symbols->map.end() && i.op != "ret")
         {
             if(vmap.find(i.type) == vmap.end())
             {
@@ -359,7 +378,7 @@ void initTmpVariables(std::ofstream& file, BBlock* start)
 
 // ---------------------------------------------------------------------------------------------------------
 
-void dumpCFG(std::ofstream& file, BBlock* start)
+void dumpCFGInstructions(std::ofstream& file, BBlock* start)
 {
     BBlock* endBlock = start->getLastBlock();
 
@@ -437,7 +456,7 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
 {
     std::ofstream file;
     file.open("target.c");
-    file << "#include <stdio.h>" << std::endl; // printf
+    file << "#include <stdio.h>" << std::endl;   // printf
     file << "#include <math.h>" << std::endl;    // pow
     file << std::endl;
     
@@ -454,7 +473,7 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
         initTmpVariables(file, f.second);
 
         // Dump all block in the CFG.
-        dumpCFG(file, f.second);
+        dumpCFGInstructions(file, f.second);
 
         file << "}" << std::endl << std::endl; 
     }
@@ -468,7 +487,7 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
     initTmpVariables(file, start);
 
     // Dump all block in the CFG.
-    dumpCFG(file, start);
+    dumpCFGInstructions(file, start);
 
     // End
     file << "\treturn 0;\n}\n";
