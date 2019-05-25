@@ -6,6 +6,11 @@
 class Data
 {
 public:
+	struct TypeHash
+	{
+		template<typename T>
+		std::size_t operator()(T t) const { return static_cast<std::size_t>(t); }
+	};
 	enum Type {NUMBER, STRING, BOOL, NIL, FUNCTION, FUNCTIONCALL, TABLE, SCOPE, EMPTY, MAX, MAX2 };
 	static std::string TypeNames[Type::MAX2];
 

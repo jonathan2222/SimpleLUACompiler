@@ -256,7 +256,8 @@ void BBlock::fetchVars(VMap& vmap, Symbols* symbols)
         {
             if(vmap.find(i.type) == vmap.end())
             {
-                vmap.insert({i.type, VSet()});
+                VSet vSet;
+                vmap.insert({i.type, vSet});
             }
             VSet& vset = vmap[i.type];
             vset.insert(i.name);
@@ -362,7 +363,7 @@ void initTmpVariables(std::ofstream& file, BBlock* start)
 {
     auto varTypeToFile = [&file](VMap::iterator it)->void {
         file << "\t" << getType(it->first) << " ";
-        VSet::iterator sIt = it->second.begin();
+        std::set<std::string>::iterator sIt = it->second.begin();
         for(int i = 0; sIt != it->second.end(); sIt++, i++)
             file << (i==0? "" : ", ") << *sIt;
         file << ";" << std::endl;

@@ -13,7 +13,7 @@
 #include "Symbols.hh"
 
 #define VSet std::set<std::string>
-#define VMap std::unordered_map<Data::Type, VSet>
+#define VMap std::unordered_map<Data::Type, VSet, Data::TypeHash>
 
 /************* Three Address Instructions *************/
 class Symbols;
