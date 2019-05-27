@@ -78,10 +78,10 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             std::string s;
             s += "\t// Expand " + this->name + " := " + this->lhs + " + " + this->rhs + "\n";
             s += "\tasm __volatile__(\n";
-            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
-            s += "\t\t\"addsd %%xmm0, %%xmm1\\n\"\n";
-            s += "\t\t\"movsd %%xmm1, %[" + this->name + "]\\n\"\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"addsd %%xmm0, %%xmm1\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm1, %[" + this->name + "]\\n\\t\"\n";
 
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -92,6 +92,30 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
             s += "\t);\n";
             return s;    
+        }
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " + " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"addsd %%xmm0, %%xmm1\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm1, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
         }
 	}
 	else if(this->op == "-")
@@ -103,10 +127,10 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             std::string s;
             s += "\t// Expand " + this->name + " := " + this->lhs + " - " + this->rhs + "\n";
             s += "\tasm __volatile__(\n";
-            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
-            s += "\t\t\"subsd %%xmm1, %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"subsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
 
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -117,6 +141,30 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
             s += "\t);\n";
             return s;    
+        }
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " - " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"subsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
         }
 	}
 	else if(this->op == "*")
@@ -128,10 +176,10 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             std::string s;
             s += "\t// Expand " + this->name + " := " + this->lhs + " * " + this->rhs + "\n";
             s += "\tasm __volatile__(\n";
-            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
-            s += "\t\t\"mulsd %%xmm1, %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"mulsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
 
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -142,6 +190,30 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
             s += "\t);\n";
             return s;    
+        }
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " * " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"mulsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
         }
 	}
 	else if(this->op == "/")
@@ -153,10 +225,10 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             std::string s;
             s += "\t// Expand " + this->name + " := " + this->lhs + " / " + this->rhs + "\n";
             s += "\tasm __volatile__(\n";
-            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";
-            s += "\t\t\"divsd %%xmm1, %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"divsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
 
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -168,10 +240,59 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;    
         }
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " / " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"divsd %%xmm1, %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
+        }
 	}
     else if(this->op == "^")
 	{
-		return "\t" + this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
+        if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+		    return "\t" + this->name + " = pow(" + cut(this->lhs) + ", " + cut(this->rhs) + ");\n";
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " ^ " + this->rhs + "\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"call pow\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
+        }
 	}
     else if(this->op == "%")
 	{
@@ -183,15 +304,15 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t// Expand " + this->name + " := " + this->lhs + " % " + this->rhs + " -> " + 
                 this->name + " := " + this->lhs + " - " + this->rhs + " * (long int)(" + this->lhs + " / " + this->rhs + ")\n";
             s += "\tasm __volatile__(\n";
-            s += "\t\t\"movsd %[a], %%xmm0\\n\"\n";
-            s += "\t\t\"movsd %[b], %%xmm1\\n\"\n";     
-            s += "\t\t\"movsd %%xmm0, %%xmm2\\n\"\n";   
-            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\"\n";       // xmm2 = xmm0 / xmm1
-            s += "\t\t\"cvttsd2siq %%xmm2, %%rax\\n\"\n";   // rax = (long int)xmm2
-            s += "\t\t\"cvtsi2sdq %%rax, %%xmm2\\n\"\n";    // xmm2 = rax
-            s += "\t\t\"mulsd %%xmm1, %%xmm2\\n\"\n";       // xmm2 = xmm1 * xmm2
-            s += "\t\t\"subsd %%xmm2, %%xmm0\\n\"\n";       // xmm0 = xmm0 - xmm2
-            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\"\n";
+            s += "\t\t\"movsd %[a], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[b], %%xmm1\\n\\t\"\n";     
+            s += "\t\t\"movsd %%xmm0, %%xmm2\\n\\t\"\n";   
+            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm0 / xmm1
+            s += "\t\t\"cvttsd2siq %%xmm2, %%rax\\n\\t\"\n";   // rax = (long int)xmm2
+            s += "\t\t\"cvtsi2sdq %%rax, %%xmm2\\n\\t\"\n";    // xmm2 = rax
+            s += "\t\t\"mulsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm1 * xmm2
+            s += "\t\t\"subsd %%xmm2, %%xmm0\\n\\t\"\n";       // xmm0 = xmm0 - xmm2
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
 
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -203,11 +324,52 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;    
         }
+        else if(compLevel == CompileLevel::C)
+        {
+            bool lhsEqRhs = this->lhs == this->rhs;
+            // May need to change rax to some other register.
+            std::string s;
+            s += "\t// Expand " + this->name + " := " + this->lhs + " % " + this->rhs + " -> " + 
+                this->name + " := " + this->lhs + " - " + this->rhs + " * (long int)(" + this->lhs + " / " + this->rhs + ")\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            if(lhsEqRhs)
+                s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
+            else
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"movsd %%xmm0, %%xmm2\\n\\t\"\n";
+            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm0 / xmm1
+            s += "\t\t\"cvttsd2siq %%xmm2, %%rax\\n\\t\"\n";   // rax = (long int)xmm2
+            s += "\t\t\"cvtsi2sdq %%rax, %%xmm2\\n\\t\"\n";    // xmm2 = rax
+            s += "\t\t\"mulsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm1 * xmm2
+            s += "\t\t\"subsd %%xmm2, %%xmm0\\n\\t\"\n";       // xmm0 = xmm0 - xmm2
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")" + (lhsEqRhs?"":",") + "\n";
+            if(!lhsEqRhs)
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"%xmm2\", \"%rax\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
+        }
 	}
     // -------------------- Comparison operators -------------------- 
 	else if(this->op == "==")
 	{
-		return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
+		//if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+	    return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
+        /*else if(this->type == Data::Type::STRING)
+        {
+            std::string s;
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+            s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
+            s += "\t\t\"compsd %%xmm1, %%xmm0\\n\\t\"\n";            // Not sure if this works for floating-point numbers 
+            s += "\t\t\"je ----\\n\\t\"\n";
+            return s;
+        }*/
 	}
     else if(this->op == "~=")
 	{
@@ -232,15 +394,96 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     // --------------------------------------------------------------------------
     else if(this->op == "cpy")
 	{
-		return "\t" + this->name + " = " + cut(this->lhs) + ";\n";
+        if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+		    return "\t" + this->name + " = " + cut(this->lhs) + ";\n";
+        else if(compLevel == CompileLevel::C)
+        {
+            if(this->type == Data::Type::NUMBER || this->type == Data::Type::BOOL)
+            {
+                std::string s;
+                s += "\t// Expand " + this->name + " := " + this->lhs + "\n";
+                s += "\tasm __volatile__(\n";
+                s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
+                s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
+                // Output
+                s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+                // Input
+                s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + ")\n";
+                // Clobbered registers
+                s += "\t\t: \"%xmm0\", \"cc\"\n";
+                s += "\t);\n";
+                return s;
+            }
+            else if(this->type == Data::Type::STRING)
+            {
+                // This might be wrong.
+                std::string s;
+                s += "\t// Expand " + this->name + " := " + this->lhs + "\n";
+                s += "\tasm __volatile__(\n";
+                s += "\t\t\"movq %[" + this->lhs + "], %%rax\\n\\t\"\n";
+                s += "\t\t\"movq %%rax, %[" + this->name + "]\\n\\t\"\n";
+                // Output
+                s += "\t\t: [" + this->name + "] \"=g\" (" + this->name + ")\n";
+                // Input
+                s += "\t\t: [" + this->lhs + "] \"g\" (" + cut(this->lhs) + ")\n";
+                // Clobbered registers
+                s += "\t\t: \"%rax\", \"cc\"\n";
+                s += "\t);\n";
+                return s;
+            }
+        }
 	}
     else if(this->op == "storeAt")
     {
-        return "\t" + this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
+        if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+            return "\t" + this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
+        else if(compLevel == CompileLevel::C)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + "[(long int)" + cut(this->rhs) + " - 1] = " + cut(this->lhs) + ";\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->rhs + "], %%xmm0\\n\\t\"\n";                 // xmm0 = rhs
+            s += "\t\t\"cvttsd2siq %%xmm0, %%rax\\n\\t\"\n";                           // rax = (long int)xmm0
+            s += "\t\t\"subq $1, %%rax\\n\\t\"\n";                                     // rax = rax - 1
+            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm1\\n\\t\"\n";                 // xmm1 = lhs
+            s += "\t\t\"lea %[" + this->name + "], %%rdx\\n\\t\"\n";                   // rbx = &name
+            s += "\t\t\"movsd %%xmm1, (%%rdx, %%rax, 8)\\n\\t\"\n";                    // rbx[rax] = xmm1 
+            // Output
+            s += "\t\t: [" + this->name + "] \"=g\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"x\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%xmm1\", \"%rax\", \"%rdx\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
+        }
     }
     else if(this->op == "loadAt")
     {
-        return "\t" + this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
+        if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+            return "\t" + this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
+        else if(compLevel == CompileLevel::C)
+        {
+            std::string s;
+            s += "\t// Expand " + this->name + " = " + cut(this->lhs) + "[(long int)" + cut(this->rhs) + " - 1];\n";
+            s += "\tasm __volatile__(\n";
+            s += "\t\t\"movsd %[" + this->rhs + "], %%xmm0\\n\\t\"\n";                 // xmm0 = rhs
+            s += "\t\t\"cvttsd2siq %%xmm0, %%rax\\n\\t\"\n";                           // rax = (long int)xmm0
+            s += "\t\t\"subq $1, %%rax\\n\\t\"\n";                                     // rax = rax - 1
+            //s += "\t\t\"lea %[" + this->lhs + "], %%rdx\\n\\t\"\n";                    // rbx = &lhs
+            s += "\t\t\"movsd (%[" + this->lhs + "], %%rax, 8), %%xmm0\\n\\t\"\n";                    // xmm0 = rbx[rax]
+            s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";                // name = xmm0
+            // Output
+            s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
+            // Input
+            s += "\t\t: [" + this->lhs + "] \"g\" (" + cut(this->lhs) + "),\n";
+            s += "\t\t  [" + this->rhs + "] \"x\" (" + cut(this->rhs) + ")\n";
+            // Clobbered registers
+            s += "\t\t: \"%xmm0\", \"%rax\", \"%rdx\", \"cc\"\n";
+            s += "\t);\n";
+            return s;
+        }
     }
     else if(this->op == "call") // Function call.
 	{
@@ -424,7 +667,7 @@ std::string getType(Data::Type type)
     if(type == Data::Type::STRING)
         return "char*";
     if(type == Data::Type::BOOL)
-        return "int";
+        return "long int";
     return Data::typeToString(type);
 }
 
@@ -466,14 +709,15 @@ void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclu
         std::vector<Symbol>::iterator it = std::find(exclude.begin(), exclude.end(), sym);
         if(it == exclude.end())
         {
+            std::string cStr = (e.first.size() > 2 ? (e.first[0] == '_' || e.first[2] == '_' ? "const " : "") : "");
             if(sym.data.type == Data::Type::NUMBER)
-                file << "\tdouble " << e.first << ";" << std::endl;
+                file << "\t" << cStr << "double " << e.first << " = " << sym.data.f << ";" << std::endl;
             if(sym.data.type == Data::Type::STRING)
-                file << "\tchar " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
+                file << "\t" << cStr << "char " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
             if(sym.data.type == Data::Type::BOOL)
-                file << "\tint " << e.first << ";" << std::endl;
+                file << "\t" << cStr << "long int " << e.first << " = " << (long int)sym.data.b << ";" << std::endl;
             if(sym.data.type == Data::Type::TABLE)
-                file << "\tdouble " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+                file << "\t" << cStr << "double " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
         }
     }
     file << std::endl;

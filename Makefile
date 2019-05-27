@@ -16,4 +16,4 @@ targetDC: target.c
 		gcc target.c -o target -lm && ./target
 
 clean:
-		rm -f binary.tab.* lex.yy.c* comp binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.c target.cc
+		rm -f binary.tab.* lex.yy.c* comp binary.output parse.dot.pdf parse.dot cfg.dot cfg.dot.pdf stack.hh target target.c target.cc target.s

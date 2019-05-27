@@ -384,8 +384,23 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 		sym.data.s = this->data.s;
 		addSymbol(this->name, sym);
 	}
-	else
-		makeName();
+	else if(data.type == Data::Type::BOOL)
+	{
+		//makeName();
+		::Expression::makeName("_b_");
+		Symbol sym(Data::Type::BOOL);
+		sym.size = sizeof(long int);
+		sym.data.b = this->data.b;
+		addSymbol(this->name, sym);
+	}
+	else if(data.type == Data::Type::NUMBER)
+	{
+		::Expression::makeName("_n_");
+		Symbol sym(Data::Type::NUMBER);
+		sym.size = sizeof(double);
+		sym.data.f = this->data.f;
+		addSymbol(this->name, sym);
+	}
 
 	data.name = this->name;
 	result.second = this->name;
@@ -839,8 +854,8 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 					n->convert(out);
 					// print always has a new line at the end and a tab between each expression.
 					std::string s = n->name;
-					if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
-						s = "#" + s;
+					//if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
+					s = "#" + s;
 					if(cn == exp_list->children.size())
 						s += "\n";
 					else
@@ -870,13 +885,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						makeName();
 						n->convert(out);
 						std::string s = n->name;
-						if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
+						//if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
 							s = "#" + s;
-						else
+						/*else
 						{
 							if(n->data.type == Data::Type::NUMBER)
 								s = s.substr(1);
-						}
+						}*/
 
 						out->instructions.push_back(ThreeAd(this->name, "call", "printf", s, Data::Type::NIL));
 						this->ret.type = Data::Type::NIL;
@@ -958,10 +973,8 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out)
 	{
 		Node* c2 = c->children.front();
 		c2->convert(out);
-		// Assume all elements are numbers.
-		std::string ds = c2->name.substr(1);
-		double d = std::stod(ds);
-		this->arr.push_back(d);
+		
+		this->arr.push_back(c2->getSymbol(c2->name));
 	}
 	
 	result.second = this->name;
@@ -973,10 +986,16 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 	std::pair<BBlock*, std::string> result(out, this->name);
 
 	unsigned int index = 1;
-	for(double d : this->arr)
+	for(Symbol e : this->arr)
 	{
 		// Insert d into sym at position index.
-		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", std::to_string(d), std::to_string(index), Data::Type::TABLE));
+		//out->instructions.push_back(ThreeAd(e.data.name, "=", std::to_string(e.data.f), "", Data::Type::NUMBER));
+		Symbol s(Data::Type::NUMBER);
+		s.data.f = (double)index;
+		s.size = sizeof(double);
+		std::string idxName = "_idx" + std::to_string(index);
+		this->addSymbol(idxName, s);
+		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", e.data.name, idxName, Data::Type::TABLE));
 		index += 1; // TODO: Change this when using asm. 
 	}
 	return result;

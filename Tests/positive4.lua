@@ -2,9 +2,11 @@ print "enter a number:"
 n = io.read("*number")
 for i = 2,n 
 do
-  if n%i==0 then
 	io.write(i)
-	io.write(" is a factor of ")
+  if n%i==0 then
+		io.write(" is a factor of ")
+	else
+		io.write(" is not factor of ")
+	end
 	print(n)
-  end
 end

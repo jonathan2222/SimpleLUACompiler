@@ -4,6 +4,7 @@
 # Don't track these files
 target.cc
 target.c
+target.s
 target
 comp
 stack.hh

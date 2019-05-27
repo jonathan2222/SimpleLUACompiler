@@ -238,7 +238,7 @@ public:
 
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out, const Symbol& sym);
-	std::vector<double> arr;
+	std::vector<Symbol> arr;
 };
 
 // ---------------------------------------------------------------------------------------------------------
