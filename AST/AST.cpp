@@ -451,7 +451,7 @@ std::pair<BBlock*, std::string> Operation::convert(BBlock* out)
 
 	makeName();
 	std::pair<BBlock*, std::string> result(out, this->name);
-	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, Data::Type::NUMBER));
+	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, Data::Type::NUMBER, result.first));
 
 	data.name = this->name;
 	return result;
@@ -558,7 +558,7 @@ std::pair<BBlock*, std::string> AssignmentOne::convert(BBlock* out, bool shouldA
 		cIndex->convert(out);
 		std::string tblIndexVarI = cIndex->name;
 		this->data.type = Data::Type::TABLE;
-		result.first->instructions.push_back(ThreeAd(tblIndexVar, "storeAt", rhs->name, tblIndexVarI, Data::Type::TABLE));
+		result.first->instructions.push_back(ThreeAd(tblIndexVar, "storeAt", rhs->name, tblIndexVarI, Data::Type::TABLE, result.first));
 	}
 	else
 	{
@@ -603,7 +603,7 @@ std::pair<BBlock*, std::string> AssignmentOne::convert(BBlock* out, bool shouldA
 		}
 		if(shouldAddSym)
 			addSymbol(this->name, sym);
-		result.first->instructions.push_back(ThreeAd(this->name, "cpy", rhs->name, rhs->name, this->data.type));	
+		result.first->instructions.push_back(ThreeAd(this->name, "cpy", rhs->name, rhs->name, this->data.type, result.first));	
 	}	
 	
 	return result;
@@ -732,8 +732,8 @@ std::pair<BBlock*, std::string> For::convert(BBlock* out)
 	while(e->tExit != end)
 		e = e->tExit;
 	makeName();
-	e->instructions.push_back(ThreeAd(this->name, "+", as->name, "$" + std::to_string(1), as->data.type));
-	e->instructions.push_back(ThreeAd(as->name, "cpy", this->name, this->name, as->data.type));
+	e->instructions.push_back(ThreeAd(this->name, "+", as->name, "$" + std::to_string(1), as->data.type, e));
+	e->instructions.push_back(ThreeAd(as->name, "cpy", this->name, this->name, as->data.type, e));
 	e->tExit = ifBlock;
 
 	// After each block, go back to start of forBlock.
@@ -797,21 +797,32 @@ std::pair<BBlock*, std::string> Repeat::convert(BBlock* out)
 std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 {
 	bool isPredefined = false;
+	BBlock* block = out;
+
+	auto addSymStr = [&](const std::string& name, const std::string& cmd) {
+		if(hasSymbol(name) == false)
+		{
+			Symbol sym(Data::Type::STRING);
+			std::string s = cmd;
+			sym.data.s = s;
+			sym.size = sizeof(s);
+			addSymbol(name, sym);	
+		}
+	};
 
 	Var* lhs = dynamic_cast<Var*>(this->children.front());
-	lhs->convert(out);
+	lhs->convert(block);
 	Constant* str = dynamic_cast<Constant*>(this->children.back()); 
 	if(str != nullptr)
 	{
-		str->convert(out);
+		str->convert(block);
 		makeName();
 		
 		// Print when only string as an argument.
 		if(lhs->name == "print")
 		{
-			std::string s = str->name;
-			s += "\n";
-			out->instructions.push_back(ThreeAd(this->name, "call", "printf", "#" + s, Data::Type::NIL));
+			addSymStr("_STR_S_NL", "%s\\n");
+			block->instructions.push_back(ThreeAd(this->name, "call", "printf_vnl", str->name, Data::Type::NIL, block));
 			this->ret.type = Data::Type::NIL;
 			isPredefined = true;
 		}
@@ -820,11 +831,12 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 		if(lhs->name == "io")
 		{
 			Var* lhs2 = dynamic_cast<Var*>(lhs->children.front());
-			lhs2->convert(out);
+			lhs2->convert(block);
 			
 			if(lhs2->name == "write")
 			{
-				out->instructions.push_back(ThreeAd(this->name, "call", "printf", "#" + str->name, Data::Type::NIL));
+				addSymStr("_STR_S", "%s");
+				block->instructions.push_back(ThreeAd(this->name, "call", "printf_v", str->name, Data::Type::NIL, block));
 				this->ret.type = Data::Type::NIL;
 				isPredefined = true;
 			}
@@ -851,16 +863,37 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 					cn++;
 					// New name each iteration.
 					makeName();
-					n->convert(out);
-					// print always has a new line at the end and a tab between each expression.
+					n->convert(block);
+					
 					std::string s = n->name;
-					//if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
-					s = "#" + s;
 					if(cn == exp_list->children.size())
-						s += "\n";
+					{
+						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
+						{
+							addSymStr("_STR_F_NL", "%.1f\\n");
+							block->instructions.push_back(ThreeAd(this->name, "call", "printf_fnl", s, Data::Type::NIL, block));
+						}
+						else
+						{
+							addSymStr("_STR_F_NL", "%.1f\\n");
+							addSymStr("_STR_S_NL", "%s\\n");
+							block->instructions.push_back(ThreeAd(this->name, "call", "printf_vnl", s, Data::Type::NIL, block));
+						}
+					}
 					else
-						s += "\t";
-					out->instructions.push_back(ThreeAd(this->name, "call", "printf", s, Data::Type::NIL));
+					{
+						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
+						{
+							addSymStr("_STR_F_T", "%.1f\\t");
+							block->instructions.push_back(ThreeAd(this->name, "call", "printf_ft", s, Data::Type::NIL, block));
+						}
+						else
+						{
+							addSymStr("_STR_F_T", "%.1f\\t");
+							addSymStr("_STR_S_T", "%s\\t");
+							block->instructions.push_back(ThreeAd(this->name, "call", "printf_vt", s, Data::Type::NIL, block));
+						}
+					}
 					this->ret.type = Data::Type::NIL;
 				}
 			}
@@ -870,7 +903,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 		{
 			isPredefined = true;
 			Var* lhs2 = dynamic_cast<Var*>(lhs->children.front());
-			lhs2->convert(out);
+			lhs2->convert(block);
 
 			if(lhs2->name == "write")
 			{
@@ -883,17 +916,11 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						cn++;
 						// New name each iteration.
 						makeName();
-						n->convert(out);
-						std::string s = n->name;
-						//if(dynamic_cast<Constant*>(n) == nullptr || n->data.type == Data::Type::STRING)
-							s = "#" + s;
-						/*else
-						{
-							if(n->data.type == Data::Type::NUMBER)
-								s = s.substr(1);
-						}*/
-
-						out->instructions.push_back(ThreeAd(this->name, "call", "printf", s, Data::Type::NIL));
+						n->convert(block);
+						
+						addSymStr("_STR_F", "%.1f");
+						addSymStr("_STR_S", "%s");
+						block->instructions.push_back(ThreeAd(this->name, "call", "printf_v", n->name, Data::Type::NIL, block));
 						this->ret.type = Data::Type::NIL;
 					}
 				}
@@ -903,12 +930,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 				Node* exp_list = args->children.front();
 				// Assume one child.
 				Node* child = exp_list->children.front();
-				//child->convert(out);
+				
 				if(child->data.s == "*number")
 				{
 					// Read number
 					makeName();
-					out->instructions.push_back(ThreeAd(this->name, "call", "scanf", "%d", Data::Type::NUMBER));
+					addSymStr("_STR_SCAN_F", "%lf");
+					block->instructions.push_back(ThreeAd(this->name, "call", "scanf", "NUM", Data::Type::NUMBER, block));
 					this->ret.type = Data::Type::NUMBER;
 				}
 			}
@@ -920,31 +948,22 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 			if(hasSymbol(lhs->name))
 			{
 				Symbol sym = getSymbol(lhs->name);
-				//out->instructions.push_back(ThreeAd(this->name, "call", sym.name, ));
-				//this->ret.type = ;
 
 				makeName();
 				Node* exp_list = args->children.front();
 				if(exp_list->tag == "Exp_list")
 				{
-					/*unsigned cn = 0;
-					for(Node* n : exp_list->children)
-					{
-						n->convert(out);
-						makeName();
-						out->instructions.push_back(ThreeAd(this->name, "pushArg", n->name, n->name));
-					}*/
-
 					// Assume one or none arguments.
 					Node* n = exp_list->children.front();
-					n->convert(out);
+					n->convert(block);
+					
 					// Assume NUMBER as return type.
-					out->instructions.push_back(ThreeAd(this->name, "call", lhs->name, n->name, Data::Type::NUMBER));
+					block->instructions.push_back(ThreeAd(this->name, "call", lhs->name, n->name, Data::Type::NUMBER, block));
 				}
 				else
 				{
 					// Assume NUMBER as return type.
-					out->instructions.push_back(ThreeAd(this->name, "call", lhs->name, "NIL", Data::Type::NUMBER));
+					block->instructions.push_back(ThreeAd(this->name, "call", lhs->name, "NIL", Data::Type::NUMBER, block));
 				}
 			}
 			else
@@ -953,10 +972,9 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 				this->ret.type = Data::Type::NIL;
 			}
 		}
-	
 	}
 	
-	std::pair<BBlock*, std::string> result(out, this->name);
+	std::pair<BBlock*, std::string> result(block, this->name);
 	return result;
 }
 
@@ -989,13 +1007,12 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 	for(Symbol e : this->arr)
 	{
 		// Insert d into sym at position index.
-		//out->instructions.push_back(ThreeAd(e.data.name, "=", std::to_string(e.data.f), "", Data::Type::NUMBER));
 		Symbol s(Data::Type::NUMBER);
 		s.data.f = (double)index;
 		s.size = sizeof(double);
 		std::string idxName = "_idx" + std::to_string(index);
 		this->addSymbol(idxName, s);
-		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", e.data.name, idxName, Data::Type::TABLE));
+		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", e.data.name, idxName, Data::Type::TABLE, out));
 		index += 1; // TODO: Change this when using asm. 
 	}
 	return result;
@@ -1017,7 +1034,7 @@ std::pair<BBlock*, std::string> TableIndex::convert(BBlock* out)
 		makeName();
 	}
 	
-	out->instructions.push_back(ThreeAd(this->name, "loadAt", var->name, index->name, Data::Type::NUMBER));
+	out->instructions.push_back(ThreeAd(this->name, "loadAt", var->name, index->name, Data::Type::NUMBER, out));
 
 	// Assume all data from a table are numbers.
 	this->data.type = Data::Type::NUMBER;
@@ -1033,11 +1050,11 @@ std::pair<BBlock*, std::string> Hash::convert(BBlock* out)
 	Expression* child = dynamic_cast<Expression*>(this->children.front());
 	child->convert(out);
 
-	// If it would have been a more generall case, than I would have not fetched the size at runtime, but instead use a separet instruction for it. 
+	// If it would have been a more general case, than I would have not fetched the size at runtime, but instead use a separet instruction for it. 
 	unsigned int size = getSymbol(child->name).size/sizeof(double);
 	std::string sSize = "$" + std::to_string(size);
 	makeName();
-	out->instructions.push_back(ThreeAd(this->name, "cpy", sSize, sSize, Data::Type::NUMBER));
+	out->instructions.push_back(ThreeAd(this->name, "cpy", sSize, sSize, Data::Type::NUMBER, out));
 
 	this->data.type = Data::Type::NUMBER;
 	return result;
@@ -1060,8 +1077,6 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 		topNode->functions.push_back(funcBlock);
 
 		Symbol sym(Data::Type::FUNCTION);
-		// TODO: Change this. This will not work!
-		//funcBlock->symbols = new Symbols(nullptr);
 		sym.funcBlock = funcBlock; // Every instance of the function, has its own cfg.
 		funcBlock->symbols = this->symbols;
 		this->parent->addSymbol(funcName->name, sym);
@@ -1109,24 +1124,33 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 std::pair<BBlock*, std::string> Return::convert(BBlock* out)
 {
 	std::pair<BBlock*, std::string> result(out, "");
+	BBlock* block = out;
 
 	// Assume one return expression or none.
 	if(this->children.empty() == false)
 	{
 		Expression* retExp = dynamic_cast<Expression*>(this->children.front()->children.front());
 		retExp->convert(out);
-		/*makeName();
-		out->instructions.push_back(ThreeAd(this->name, "pushRet", retExp->name, retExp->name));
-		*/
+		if(out->instructions.empty() == false)
+		{
+			block = new BBlock();
+			out->tExit = block;
+		}
 		makeName();
-		out->instructions.push_back(ThreeAd(this->name, "ret", retExp->name, retExp->name, retExp->data.type));
+		block->instructions.push_back(ThreeAd(this->name, "ret", retExp->name, retExp->name, retExp->data.type, block));
 	}
 	else
 	{
+		if(out->instructions.empty() == false)
+		{
+			block = new BBlock();
+			out->tExit = block;
+		}
 		makeName();
 		// Assume NUMBER as return type.
-		out->instructions.push_back(ThreeAd(this->name, "ret", "NIL", "NIL", Data::Type::NUMBER));
+		block->instructions.push_back(ThreeAd(this->name, "ret", "NIL", "NIL", Data::Type::NUMBER, block));
 	}
 	
+	result.first = block;
 	return result;
 }

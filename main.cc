@@ -22,7 +22,7 @@ void showHelp()
 int processOptions(int argc, char** argv)
 {
     // Default comp-level
-    compLevel = CompileLevel::D;
+    compLevel = CompileLevel::C;
 
     int fileIndex = -1;
     for(unsigned i = 1; i < argc; i++)

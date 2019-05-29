@@ -68,7 +68,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         return s;
     };
 
-    // -------------------- Arthmetic operators --------------------
+    // -------------------- Arithmetic operators --------------------
 	if(this->op == "+")
 	{
         if(compLevel == CompileLevel::E)
@@ -280,7 +280,8 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 s += "\t\t\"movsd %%xmm0, %%xmm1\\n\\t\"\n";
             else
                 s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
-            s += "\t\t\"call pow\\n\\t\"\n";
+            // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
+            s += "\t\t\"call pow@PLT\\n\\t\"\n";
             s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -359,17 +360,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     // -------------------- Comparison operators -------------------- 
 	else if(this->op == "==")
 	{
-		//if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
 	    return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
-        /*else if(this->type == Data::Type::STRING)
-        {
-            std::string s;
-            s += "\t\t\"movsd %[" + this->lhs + "], %%xmm0\\n\\t\"\n";
-            s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
-            s += "\t\t\"compsd %%xmm1, %%xmm0\\n\\t\"\n";            // Not sure if this works for floating-point numbers 
-            s += "\t\t\"je ----\\n\\t\"\n";
-            return s;
-        }*/
 	}
     else if(this->op == "~=")
 	{
@@ -487,46 +478,122 @@ std::string ThreeAd::toTarget(Symbols* symbols)
     }
     else if(this->op == "call") // Function call.
 	{
-        if(cut(this->lhs) == "printf")
-        {
-            std::string l = this->rhs;
-            if(l[0] == '#') // Variable
+        auto returnStrV = [&](const std::string& s, const std::string& f, const std::string& b)->std::string {
+            Symbol sym = symbols->get(cut(this->rhs));
+            std::string str;
+            if(sym.data.type == Data::Type::STRING)
+                str = s;
+            else if(sym.data.type == Data::Type::BOOL)
+                str = b;
+            else
+                str = f;
+            if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+                return "\tprintf(" + str  + ", " + this->rhs + ");\n";
+            else if(compLevel == CompileLevel::C)
             {
-                if(l.size() > 2 && l[1] == '_' && l[2] == 't') // Temp variable
-                {
-                    std::string l2 = getPrefix(l);
-                    // Assume only floats as temp variables in printf.
-                    return "\tprintf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
-                }
-                else // Need to fetch from symbol table.
-                {
-                    Symbol sym = symbols->get(cut(l));
-                    std::string typeStr = ".1lf";
-                    if(sym.data.type == Data::Type::STRING)
-                        typeStr = "s";
-                    else if(sym.data.type == Data::Type::BOOL)
-                        typeStr = "d";
-                    
-                    std::string l2 = getPrefix(l);
-                    return "\tprintf(\"%" + typeStr + l2 + "\", " + cut(l) + ");\n";
-                }
+                bool isDouble = sym.data.type != Data::Type::STRING;
+                std::string s;
+                s += "\t// Expand printf(" + str  + ", " + this->rhs + ");\n";
+                s += "\tasm __volatile__(\n";
+                s += "\t\t\"movq %[" + str + "], %%rdi\\n\\t\"\n";
+                if(isDouble)
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm0\\n\\t\"\n";
+                else s += "\t\t\"movq %[" + this->rhs + "], %%rsi\\n\\t\"\n";
+                // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
+                if(isDouble)
+                s += "\t\t\"movq $1, %%rax\\n\\t\"\n";
+                else s += "\t\t\"xorq %%rax, %%rax\\n\\t\"\n";
+                s += "\t\t\"call printf@PLT\\n\\t\"\n";
+                // Output
+                s += "\t\t:\n";
+                // Input
+                s += "\t\t: [" + str + "] \"g\" (" + str + "),\n";
+                s += "\t\t  [" + this->rhs + "] \"" + (isDouble?"x":"g") + "\" (" + this->rhs + ")\n";
+                // Clobbered registers
+                std::string reg = (isDouble? "\"%xmm0\", \"%rsp\"" : "\"%rsi\"" );
+                s += "\t\t: \"%rdi\", " + reg + ", \"%rax\", \"cc\"\n";
+                s += "\t);\n";
+                return s;
             }
-            else if(l[0] == '$') // Number
+        };
+        auto returnStrF = [&](const std::string& str)->std::string {
+            if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+                return "\tprintf(" + str + ", " + this->rhs + ");\n";
+            else if(compLevel == CompileLevel::C)
             {
-                std::string l2 = getPrefix(l);
-                return "\tprintf(\"%.1lf" + l2 + "\", " + cut(l) + ");\n";
-            } 
-        }
+                std::string s;
+                s += "\t// Expand printf(" + str + ", " + this->rhs + ");\n";
+                s += "\tasm __volatile__(\n";
+                s += "\t\t\"movq %[" + str + "], %%rdi\\n\\t\"\n";
+                s += "\t\t\"movsd %[" + this->rhs + "], %%xmm0\\n\\t\"\n";
+                // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
+                s += "\t\t\"movq $1, %%rax\\n\\t\"\n";
+                s += "\t\t\"call printf@PLT\\n\\t\"\n";
+                // Output
+                s += "\t\t:\n";
+                // Input
+                s += "\t\t: [" + str + "] \"g\" (" + str + "),\n";
+                s += "\t\t  [" + this->rhs + "] \"x\" (" + this->rhs + ")\n";
+                // Clobbered registers
+                s += "\t\t: \"%rdi\", \"%xmm0\", \"%rsp\", \"%rax\", \"cc\"\n";
+                s += "\t);\n";
+                return s;
+            }
+        };
+
+        if(cut(this->lhs) == "printf_v")
+            return returnStrV("_STR_S", "_STR_F", "_STR_F");
+        else if(cut(this->lhs) == "printf_vnl")
+            return returnStrV("_STR_S_NL", "_STR_F_NL", "_STR_F_NL");
+        else if(cut(this->lhs) == "printf_vt")
+            return returnStrV("_STR_S_T", "_STR_F_T", "_STR_F_T");
+        else if(cut(this->lhs) == "printf_f")
+            return returnStrF("_STR_F");
+        else if(cut(this->lhs) == "printf_fnl")
+            return returnStrF("_STR_F_NL");
+        else if(cut(this->lhs) == "printf_ft")
+            return returnStrF("_STR_F_T");
         else if(cut(this->lhs) == "scanf")
         {
-            return "\tscanf(\"%lf\", &" + this->name + ");\n";
+            Symbol sym = symbols->get(cut(this->rhs));
+            std::string str; 
+            if(compLevel == CompileLevel::E || compLevel == CompileLevel::D)
+            {
+                if(this->rhs == "NUM")
+                    str = symbols->get("_STR_SCAN_F").data.s;
+                return "\tscanf(\"" + str  + "\", " + this->name + ");\n";
+            }
+            else if(compLevel == CompileLevel::C)
+            {
+                str = "_STR_SCAN_F";
+                std::string s;
+                s += "\t// Expand printf(_STR_SCAN_F, " + this->rhs + ");\n";
+                s += "\tasm __volatile__(\n";
+                s += "\t\t\"movq %[" + str + "], %%rdi\\n\\t\"\n";
+                s += "\t\t\"leaq %[" + this->name + "], %%rsi\\n\\t\"\n";
+                // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
+                s += "\t\t\"mov $1, %%rax\\n\\t\"\n";
+                s += "\t\t\"call scanf@PLT\\n\\t\"\n";
+                // Output
+                s += "\t\t: \n";
+                // Input
+                s += "\t\t: [" + str + "] \"g\" (" + str + "),\n";
+                s += "\t\t  [" + this->name + "] \"g\" (" + this->name + ")\n";
+                // Clobbered registers
+                s += "\t\t: \"%rdi\", \"%rsi\", \"%xmm0\", \"%rax\", \"cc\"\n";
+                s += "\t);\n";
+                return s;
+            }
+            //return "\tscanf(\"%lf\", &" + this->name + ");\n";
         }
         else // User-created functions
         {
             if(this->rhs == "NIL")
                 return "\t" + this->lhs + "();\n";
             else
+            {
                 return "\t" + this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
+            }
         }
     }
     else if(this->op == "ret")
@@ -537,7 +604,6 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         {
             return "\treturn " + cut(this->lhs) + ";\n";
         }
-        
     }
 }
 
@@ -572,7 +638,6 @@ std::string BBlock::toTarget(Symbols* symbols)
 {
 	std::string out;
 	out += this->name + ":\n";
-	
     for(auto i : this->instructions)
         out += i.toTarget(symbols);
 
@@ -596,7 +661,7 @@ std::string BBlock::toTarget(Symbols* symbols)
 
 	out += "\t// End of block.\n";
 
-	// It is the termenated block.
+	// It is the terminated block.
 	if(!this->tExit && !this->fExit)
 	{
 		out += "\t// Finished!\n";
@@ -606,7 +671,7 @@ std::string BBlock::toTarget(Symbols* symbols)
 
 bool BBlock::hasReturn() const
 {
-    // Return ture if a return operator was found.
+    // Return true if a return operator was found.
     for(ThreeAd i : this->instructions)
         if(i.op == "ret")
             return true;
@@ -764,13 +829,12 @@ void dumpCFGInstructions(std::ofstream& file, BBlock* start)
         if(next != endBlock)
         {
             std::string code = next->toTarget(start->symbols);
-
             // Insert code block in file.
             file << code;
 
             if(dbg_wasT)
             {
-                file << "// This is the false-branch of the if in the test-case\n";
+                file << "// This is the false-branch\n";
                 dbg_wasT = false;
             }
             
@@ -791,7 +855,7 @@ void dumpCFGInstructions(std::ofstream& file, BBlock* start)
             // Check if it was If.
             if(dbg_hasT && dbg_hasF)
             {
-                file << "// This is the true-branch of the if in the test-case\n";
+                file << "// This is the true-branch\n";
                 dbg_wasT = true;
             }
         }
