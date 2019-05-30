@@ -135,7 +135,7 @@ void Node::fillCfg(std::ofstream& file, BBlock* start)
 {
 	static unsigned clusterID = 0;
 	file << "\tsubgraph cluster" << std::to_string(++clusterID) << " {" << std::endl;
-	file << "\t\tlabel=\"Culster_" << std::to_string(clusterID) << "\";" << std::endl;
+	file << "\t\tlabel=\"Cluster_" << std::to_string(clusterID) << "\";" << std::endl;
 	file << "\t\tcolor=blue;" << std::endl;
 	file << "\t\tfontcolor=white;" << std::endl;
 
@@ -451,7 +451,7 @@ std::pair<BBlock*, std::string> Operation::convert(BBlock* out)
 
 	makeName();
 	std::pair<BBlock*, std::string> result(out, this->name);
-	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, Data::Type::NUMBER, result.first));
+	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, this->data.type, result.first));
 
 	data.name = this->name;
 	return result;
@@ -732,7 +732,16 @@ std::pair<BBlock*, std::string> For::convert(BBlock* out)
 	while(e->tExit != end)
 		e = e->tExit;
 	makeName();
-	e->instructions.push_back(ThreeAd(this->name, "+", as->name, "$" + std::to_string(1), as->data.type, e));
+	
+	std::string oneSym = "_n_ONE";
+	if(hasSymbol(oneSym) == false)
+	{
+		Symbol symOne(Data::Type::NUMBER);
+		symOne.data.f = 1.0;
+		symOne.size = sizeof(double);
+		addSymbol(oneSym, symOne);
+	}
+	e->instructions.push_back(ThreeAd(this->name, "+", as->name, oneSym, as->data.type, e));
 	e->instructions.push_back(ThreeAd(as->name, "cpy", this->name, this->name, as->data.type, e));
 	e->tExit = ifBlock;
 
@@ -1052,9 +1061,17 @@ std::pair<BBlock*, std::string> Hash::convert(BBlock* out)
 
 	// If it would have been a more general case, than I would have not fetched the size at runtime, but instead use a separet instruction for it. 
 	unsigned int size = getSymbol(child->name).size/sizeof(double);
-	std::string sSize = "$" + std::to_string(size);
+	std::string sSym = "_n_" + std::to_string(size);
+	if(hasSymbol(sSym) == false)
+	{
+		Symbol symOne(Data::Type::NUMBER);
+		symOne.data.f = (double)size;
+		symOne.size = sizeof(double);
+		addSymbol(sSym, symOne);
+	}
+
 	makeName();
-	out->instructions.push_back(ThreeAd(this->name, "cpy", sSize, sSize, Data::Type::NUMBER, out));
+	out->instructions.push_back(ThreeAd(this->name, "cpy", sSym, sSym, Data::Type::NUMBER, out));
 
 	this->data.type = Data::Type::NUMBER;
 	return result;

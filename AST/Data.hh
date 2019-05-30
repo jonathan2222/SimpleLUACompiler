@@ -41,9 +41,9 @@ public:
 	// -----------------------
 
 	Type type = Type::EMPTY;
-	double f;
-	bool b;
-	std::string s;
+	double f = 0.0;
+	bool b = false;
+	std::string s = "";
 	std::string name;
 
 private:

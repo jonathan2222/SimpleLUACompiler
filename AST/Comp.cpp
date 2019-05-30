@@ -117,6 +117,16 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;
         }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " + " + this->rhs + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
+            s += "\tmovsd " + this->rhs + ", %xmm6\n";
+            s += "\taddsd %xmm6, %xmm5\n";
+            s += "\tmovsd %xmm5, " + this->name + "\n";
+            return s;
+        }
 	}
 	else if(this->op == "-")
 	{
@@ -164,6 +174,16 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             // Clobbered registers
             s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
             s += "\t);\n";
+            return s;
+        }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " - " + this->rhs + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
+            s += "\tmovsd " + this->rhs + ", %xmm6\n";
+            s += "\tsubsd %xmm6, %xmm5\n";
+            s += "\tmovsd %xmm5, " + this->name + "\n";
             return s;
         }
 	}
@@ -215,6 +235,16 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;
         }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " * " + this->rhs + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
+            s += "\tmovsd " + this->rhs + ", %xmm6\n";
+            s += "\tmulsd %xmm6, %xmm5\n";
+            s += "\tmovsd %xmm5, " + this->name + "\n";
+            return s;
+        }
 	}
 	else if(this->op == "/")
 	{
@@ -264,6 +294,16 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;
         }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " / " + this->rhs + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
+            s += "\tmovsd " + this->rhs + ", %xmm6\n";
+            s += "\tdivsd %xmm6, %xmm5\n";
+            s += "\tmovsd %xmm5, " + this->name + "\n";
+            return s;
+        }
 	}
     else if(this->op == "^")
 	{
@@ -281,7 +321,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             else
                 s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
             // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
-            s += "\t\t\"call pow@PLT\\n\\t\"\n";
+            s += "\t\t\"call pow\\n\\t\"\n";
             s += "\t\t\"movsd %%xmm0, %[" + this->name + "]\\n\\t\"\n";
             // Output
             s += "\t\t: [" + this->name + "] \"=x\" (" + this->name + ")\n";
@@ -292,6 +332,22 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             // Clobbered registers
             s += "\t\t: \"%xmm0\", \"%xmm1\", \"cc\"\n";
             s += "\t);\n";
+            return s;
+        }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " ^ " + this->rhs + "\n";
+            //s += "\tpush %xmm0\n";
+            //s += "\tpush %xmm1\n";
+            s += "\tsubq $8, %rsp\n";
+            s += "\tmovsd " + this->lhs + ", %xmm0\n";
+            s += "\tmovsd " + this->rhs + ", %xmm1\n";
+            s += "\tcall pow\n";
+            s += "\tmovsd %xmm0, " + this->name + "\n";
+            s += "\taddq $8, %rsp\n";
+            //s += "\tpop %xmm1\n";
+            //s += "\tpop %xmm0\n";
             return s;
         }
 	}
@@ -339,7 +395,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             else
                 s += "\t\t\"movsd %[" + this->rhs + "], %%xmm1\\n\\t\"\n";
             s += "\t\t\"movsd %%xmm0, %%xmm2\\n\\t\"\n";
-            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm0 / xmm1
+            s += "\t\t\"divsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm0 / xmm1    
             s += "\t\t\"cvttsd2siq %%xmm2, %%rax\\n\\t\"\n";   // rax = (long int)xmm2
             s += "\t\t\"cvtsi2sdq %%rax, %%xmm2\\n\\t\"\n";    // xmm2 = rax
             s += "\t\t\"mulsd %%xmm1, %%xmm2\\n\\t\"\n";       // xmm2 = xmm1 * xmm2
@@ -356,31 +412,184 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;
         }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " := " + this->lhs + " % " + this->rhs + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm0\n";
+            s += "\tmovsd " + this->rhs + ", %xmm1\n";
+            s += "\tmovsd %xmm0, %xmm2\n";
+            s += "\tdivsd %xmm1, %xmm2\n";                  // xmm2 = xmm0 / xmm1    
+            s += "\tcvttsd2siq %xmm2, %r12\n";              // rax = (long int)xmm2
+            s += "\tcvtsi2sdq %r12, %xmm2\n";              // xmm2 = rax
+            s += "\tmulsd %xmm1, %xmm2\n";                  // xmm2 = xmm1 * xmm2
+            s += "\tsubsd %xmm2, %xmm0\n";                  // xmm0 = xmm0 - xmm2
+            s += "\tmovsd %xmm0, " + this->name + "\n";
+            return s;
+        }
 	}
     // -------------------- Comparison operators -------------------- 
 	else if(this->op == "==")
 	{
-	    return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " == " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tje " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tje " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+	        return "\tif(" + cut(this->lhs) + " == " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "~=")
 	{
-		return "\tif(" + cut(this->lhs) + " != " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " ~= " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tjne " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tjne " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+		    return "\tif(" + cut(this->lhs) + " != " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "<=")
 	{
-		return "\tif(" + cut(this->lhs) + " <= " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " <= " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tjbe " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tjbe " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+		    return "\tif(" + cut(this->lhs) + " <= " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == ">=")
 	{
-		return "\tif(" + cut(this->lhs) + " >= " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " >= " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tjae " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tjae " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+		    return "\tif(" + cut(this->lhs) + " >= " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == "<")
 	{
-		return "\tif(" + cut(this->lhs) + " < " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " < " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tjb " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tjb " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+		    return "\tif(" + cut(this->lhs) + " < " + cut(this->rhs) + ")\n";
 	}
     else if(this->op == ">")
 	{
-		return "\tif(" + cut(this->lhs) + " > " + cut(this->rhs) + ")\n";
+        if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        {
+            std::string s;
+            s += "\t# " + this->lhs + " > " + this->rhs + "\n";
+            if(this->type == Data::Type::NUMBER)
+            {
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd " + this->rhs + ", %xmm1\n";
+                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tja " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            else // Assume bool.
+            {
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq " + this->rhs + ", %r13\n";
+                s += "\tcmpq %r13, %r12\n";       // r12 - r13
+                s += "\tjae " + this->parent->tExit->name + "\n";
+                s += "\tjmp " + this->parent->fExit->name + "\n";
+            }
+            return s;
+        }
+        else
+		    return "\tif(" + cut(this->lhs) + " > " + cut(this->rhs) + ")\n";
 	}
     // --------------------------------------------------------------------------
     else if(this->op == "cpy")
@@ -423,6 +632,25 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 return s;
             }
         }
+        else
+        {
+            if(this->type == Data::Type::NUMBER)
+            {
+                std::string s;
+                s += "\t# " + this->name + " := " + this->lhs + " [NUM]\n";
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tmovsd %xmm0, " + this->name + "\n";
+                return s;
+            }
+            else if(this->type == Data::Type::STRING || this->type == Data::Type::BOOL)
+            {
+                std::string s;
+                s += "\t# " + this->name + " := " + this->lhs + " [STR, BOOL]\n";
+                s += "\tmovq " + this->lhs + ", %r12\n";
+                s += "\tmovq %r12, " + this->name + "\n";
+                return s;
+            }
+        }
 	}
     else if(this->op == "storeAt")
     {
@@ -449,6 +677,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t);\n";
             return s;
         }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + "[(long int)" + this->rhs + " - 1] = " + this->lhs + ";\n";
+            s += "\tmovsd " + this->rhs + ", %xmm0\n";
+            s += "\tcvttsd2siq %xmm0, %r12\n";
+            s += "\tsubq $1, %r12\n";
+            s += "\tmovsd " + this->lhs + ", %xmm0\n";
+            s += "\tlea " + this->name + ", %r13\n";
+            s += "\tmovsd %xmm0, (%r13, %r12, 8)\n";
+            return s;
+        }
     }
     else if(this->op == "loadAt")
     {
@@ -473,6 +713,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             // Clobbered registers
             s += "\t\t: \"%xmm0\", \"%rax\", \"%rdx\", \"cc\"\n";
             s += "\t);\n";
+            return s;
+        }
+        else
+        {
+            std::string s;
+            s += "\t# " + this->name + " = " + this->lhs + "[(long int)" + this->rhs + " - 1];\n";
+            s += "\tmovsd " + this->rhs + ", %xmm0\n";
+            s += "\tcvttsd2siq %xmm0, %r12\n";
+            s += "\tsubq $1, %r12\n";
+            s += "\tlea " + this->lhs + ", %r13\n";
+            s += "\tmovsd (%r13, %r12, 8), %xmm0\n";
+            s += "\tmovsd %xmm0, " + this->name + "\n";
             return s;
         }
     }
@@ -503,7 +755,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 if(isDouble)
                 s += "\t\t\"movq $1, %%rax\\n\\t\"\n";
                 else s += "\t\t\"xorq %%rax, %%rax\\n\\t\"\n";
-                s += "\t\t\"call printf@PLT\\n\\t\"\n";
+                s += "\t\t\"call printf\\n\\t\"\n";
                 // Output
                 s += "\t\t:\n";
                 // Input
@@ -513,6 +765,42 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 std::string reg = (isDouble? "\"%xmm0\", \"%rsp\"" : "\"%rsi\"" );
                 s += "\t\t: \"%rdi\", " + reg + ", \"%rax\", \"cc\"\n";
                 s += "\t);\n";
+                return s;
+            }
+            else
+            {
+                bool isDouble = sym.data.type != Data::Type::STRING;
+                std::string s;
+                s += "\t# printf(" + str  + ", " + this->rhs + ");\n";
+                s += "\tpush %rdi\n";
+                if(isDouble == false)
+                {
+                    //s += "\tpush %rax\n";
+                    //s += "\tpush %rsi\n";
+                }
+                s += "\tleaq " + str + ", %rdi\n";
+                if(isDouble)
+                s += "\tmovsd " + this->rhs + ", %xmm0\n";
+                else 
+                {
+                    if(sym.data.type == Data::Type::BOOL)
+                        s += "\tmovq " + this->rhs + ", %rsi\n";
+                    else s += "\tleaq " + this->rhs + ", %rsi\n";
+                }
+                if(isDouble)
+                {
+                    s += "\tmovq $1, %rax\n";
+                    //s += "\tsubq $8, %rsp\n";
+                }
+                else s += "\txorq %rax, %rax\n";
+                s += "\tcall printf\n";
+                if(isDouble == false)
+                {
+                    //s += "\tpop %rsi\n";
+                    //s += "\tpop %rax\n";
+                }
+                //else s += "\taddq $8, %rsp\n";
+                s += "\tpop %rdi\n";
                 return s;
             }
         };
@@ -528,7 +816,7 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 s += "\t\t\"movsd %[" + this->rhs + "], %%xmm0\\n\\t\"\n";
                 // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
                 s += "\t\t\"movq $1, %%rax\\n\\t\"\n";
-                s += "\t\t\"call printf@PLT\\n\\t\"\n";
+                s += "\t\t\"call printf\\n\\t\"\n";
                 // Output
                 s += "\t\t:\n";
                 // Input
@@ -537,6 +825,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 // Clobbered registers
                 s += "\t\t: \"%rdi\", \"%xmm0\", \"%rsp\", \"%rax\", \"cc\"\n";
                 s += "\t);\n";
+                return s;
+            }
+            else
+            {
+                std::string s;
+                s += "\t# printf(" + str  + ", " + this->rhs + ");\n";
+                s += "\tleaq " + str + ", %rdi\n";
+                s += "\tmovsd " + this->rhs + ", %xmm0\n";
+                s += "\tmovq $1, %rax\n";
+                s += "\tsubq $8, %rsp\n";
+                s += "\tcall printf\n";
+                s += "\taddq $8, %rsp\n";
                 return s;
             }
         };
@@ -567,13 +867,13 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             {
                 str = "_STR_SCAN_F";
                 std::string s;
-                s += "\t// Expand printf(_STR_SCAN_F, " + this->rhs + ");\n";
+                s += "\t// Expand scanf(_STR_SCAN_F, " + this->rhs + ");\n";
                 s += "\tasm __volatile__(\n";
                 s += "\t\t\"movq %[" + str + "], %%rdi\\n\\t\"\n";
                 s += "\t\t\"leaq %[" + this->name + "], %%rsi\\n\\t\"\n";
                 // If this gives warnings, try "make -B" to rebuild the whole project and ignore any timestamps.
-                s += "\t\t\"mov $1, %%rax\\n\\t\"\n";
-                s += "\t\t\"call scanf@PLT\\n\\t\"\n";
+                s += "\t\t\"movq $1, %%rax\\n\\t\"\n";
+                s += "\t\t\"call scanf\\n\\t\"\n";
                 // Output
                 s += "\t\t: \n";
                 // Input
@@ -584,25 +884,63 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 s += "\t);\n";
                 return s;
             }
-            //return "\tscanf(\"%lf\", &" + this->name + ");\n";
+            else
+            {
+                str = "_STR_SCAN_F";
+                std::string s;
+                s += "\t# scanf(_STR_SCAN_F, " + this->rhs + ");\n";
+                s += "\tleaq " + str + ", %rdi\n";
+                s += "\tleaq " + this->name + ", %rsi\n";
+                s += "\tsubq $8, %rsp\n";
+                s += "\tmovq $1, %rax\n";
+                s += "\tcall scanf\n";
+                s += "\taddq $8, %rsp\n";
+                return s;
+            }
         }
         else // User-created functions
         {
             if(this->rhs == "NIL")
-                return "\t" + this->lhs + "();\n";
+            {
+                if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+                    return "\tcall " + this->lhs + "\n";
+                else return "\t" + this->lhs + "();\n";
+            }
             else
             {
-                return "\t" + this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
+                if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+                {
+                    std::string s;
+                    s += "\t# " + this->name + " := " + this->lhs  + "(" + this->rhs + ");\n";
+                    s += "\tmovsd " + this->rhs + ", %xmm0\n";
+                    s += "\tcall " + this->lhs + "\n";
+                    s += "\tmovsd %xmm0, " + this->name + "\n";
+                    return s;
+                }
+                else
+                    return "\t" + this->name + " = " + this->lhs + "(" + cut(this->rhs) + ");\n";
             }
         }
     }
     else if(this->op == "ret")
     {
         if(cut(this->lhs) == "NIL")
-            return "\treturn;\n";
+        {
+            if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+                return "\tret\n";
+            else return "\treturn;\n";
+        }
         else
         {
-            return "\treturn " + cut(this->lhs) + ";\n";
+            if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+            {
+                std::string s;
+                s += "\tmovsd " + this->lhs + ", %xmm0\n";
+                s += "\tret\n";
+                return s;
+            }
+            else
+                return "\treturn " + cut(this->lhs) + ";\n";
         }
     }
 }
@@ -657,12 +995,15 @@ std::string BBlock::toTarget(Symbols* symbols)
 	{
         if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
 		    out += "\tgoto " + this->tExit->name + ";\n";
+        else
+            out += "\tjmp " + this->tExit->name + "\n";
 	}
 
-	out += "\t// End of block.\n";
+    if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+	    out += "\t// End of block.\n";
 
 	// It is the terminated block.
-	if(!this->tExit && !this->fExit)
+	if(!this->tExit && !this->fExit && compLevel != CompileLevel::B && compLevel != CompileLevel::A)
 	{
 		out += "\t// Finished!\n";
 	}
@@ -767,22 +1108,45 @@ VMap fetchVars(BBlock* start)
 
 void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude)
 {
-    file << "\t// Initialize symbols." << std::endl;
+    if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        file << ".data" << std::endl;
+    else
+        file << "\t// Initialize symbols." << std::endl;
     for(auto& e : start->symbols->map)
     {
         Symbol& sym = e.second;
         std::vector<Symbol>::iterator it = std::find(exclude.begin(), exclude.end(), sym);
         if(it == exclude.end())
         {
-            std::string cStr = (e.first.size() > 2 ? (e.first[0] == '_' || e.first[2] == '_' ? "const " : "") : "");
-            if(sym.data.type == Data::Type::NUMBER)
-                file << "\t" << cStr << "double " << e.first << " = " << sym.data.f << ";" << std::endl;
-            if(sym.data.type == Data::Type::STRING)
-                file << "\t" << cStr << "char " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
-            if(sym.data.type == Data::Type::BOOL)
-                file << "\t" << cStr << "long int " << e.first << " = " << (long int)sym.data.b << ";" << std::endl;
-            if(sym.data.type == Data::Type::TABLE)
-                file << "\t" << cStr << "double " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+            if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+            {
+                if(sym.data.type == Data::Type::NUMBER)
+                {
+                    std::stringstream ss;
+                    ss << sym.data.f;
+                    std::string sf = ss.str();
+                    if(sf.find(".") == sf.npos) sf += ".0";
+                    file << e.first << ":\t.double " << sf << std::endl;
+                }
+                else if(sym.data.type == Data::Type::STRING)
+                    file << e.first << ":\t.string \"" + sym.data.s + "\"" << std::endl;
+                else if(sym.data.type == Data::Type::BOOL)
+                    file << e.first << ":\t.quad " << (long int)sym.data.b << std::endl;
+                else if(sym.data.type == Data::Type::TABLE)
+                    file << e.first << ":\t.zero " << sym.size << std::endl;
+            }
+            else
+            {
+                std::string cStr = (e.first.size() > 2 ? (e.first[0] == '_' || e.first[2] == '_' ? "const " : "") : "");
+                if(sym.data.type == Data::Type::NUMBER)
+                    file << "\t" << cStr << "double " << e.first << " = " << sym.data.f << ";" << std::endl;
+                else if(sym.data.type == Data::Type::STRING)
+                    file << "\t" << cStr << "char " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
+                else if(sym.data.type == Data::Type::BOOL)
+                    file << "\t" << cStr << "long int " << e.first << " = " << (long int)sym.data.b << ";" << std::endl;
+                else if(sym.data.type == Data::Type::TABLE)
+                    file << "\t" << cStr << "double " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
+            }
         }
     }
     file << std::endl;
@@ -800,11 +1164,28 @@ void initTmpVariables(std::ofstream& file, BBlock* start)
         file << ";" << std::endl;
     };
     
-    file << "\t// Initialize temp-variables." << std::endl;
+    auto varTypeToFileBA = [&](VMap::iterator it)->void {
+        std::set<std::string>::iterator sIt = it->second.begin();
+        for(int i = 0; sIt != it->second.end(); sIt++, i++)
+        {
+            if(it->first == Data::Type::NUMBER)
+                file << *sIt << ":\t.double 0.0" << std::endl;
+            else if(it->first == Data::Type::BOOL)
+                file << *sIt << ":\t.quad 0" << std::endl;
+        }
+    };
+
+    if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+        file << "\t// Initialize temp-variables." << std::endl;
     VMap vMap = fetchVars(start);
     VMap::iterator it = vMap.begin();
     for(;it != vMap.end(); it++)
-        varTypeToFile(it);
+    {
+        if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+            varTypeToFile(it);
+        else
+            varTypeToFileBA(it);
+    }
     file << std::endl;
 }
 
@@ -815,7 +1196,8 @@ void dumpCFGInstructions(std::ofstream& file, BBlock* start)
     BBlock* endBlock = start->getLastBlock();
 
     // The dump each block of code.
-    file << "\t// The code." << std::endl;
+    if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+        file << "\t// The code." << std::endl;
     bool dbg_wasT = false;
     std::set<BBlock *> done, todo;
     todo.insert(start);
@@ -834,7 +1216,8 @@ void dumpCFGInstructions(std::ofstream& file, BBlock* start)
 
             if(dbg_wasT)
             {
-                file << "// This is the false-branch\n";
+                if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+                    file << "// This is the false-branch\n";
                 dbg_wasT = false;
             }
             
@@ -855,7 +1238,8 @@ void dumpCFGInstructions(std::ofstream& file, BBlock* start)
             // Check if it was If.
             if(dbg_hasT && dbg_hasF)
             {
-                file << "// This is the true-branch\n";
+                if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+                    file << "// This is the true-branch\n";
                 dbg_wasT = true;
             }
         }
@@ -889,11 +1273,17 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
     std::string fileName = "target.cc";
     if(compLevel == CompileLevel::D || compLevel == CompileLevel::C) 
         fileName = "target.c";
+    else if(compLevel == CompileLevel::B)
+        fileName = "target.s";
     file.open(fileName);
-    file << "#include <stdio.h>" << std::endl;   // printf
-    file << "#include <math.h>" << std::endl;    // pow
-    file << std::endl;
     
+    if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
+    {
+        file << "#include <stdio.h>" << std::endl;   // printf
+        file << "#include <math.h>" << std::endl;    // pow
+        file << std::endl;
+    }
+
     // Functions.
     std::vector<std::pair<Symbol, BBlock*>> functionMap = getFunctionMap(start->symbols, funcBlocks);
     for(auto f : functionMap)
@@ -912,19 +1302,33 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
         file << "}" << std::endl << std::endl; 
     }
 
-    file << "int main()\n{\n";
+    if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+    {
+        // Initialize the variables.
+        initVariables(file, start);
 
-    // Initialize the variables.
-    initVariables(file, start);
+        // Initialize temp-variables.
+        initTmpVariables(file, start);
 
-    // Initialize temp-variables.
-    initTmpVariables(file, start);
+        file << ".text\n.globl main\nmain:\n";
+    }
+    else
+    {
+        file << "int main()\n{\n";
+        // Initialize the variables.
+        initVariables(file, start);
+
+        // Initialize temp-variables.
+        initTmpVariables(file, start);
+    }
 
     // Dump all block in the CFG.
     dumpCFGInstructions(file, start);
 
     // End
-    file << "\treturn 0;\n}\n";
+    if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+        file << "\txorq %rax, %rax\n\tret" << std::endl;
+    else file << "\treturn 0;\n}\n";
 
     file.close();
 }
