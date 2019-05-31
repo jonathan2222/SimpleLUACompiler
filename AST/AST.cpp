@@ -6,6 +6,8 @@
 #include <sstream>
 #include <queue>
 
+extern CompileLevel compLevel;
+
 unsigned Node::counterId = 0;
 unsigned Node::counterName = 0;
 
@@ -343,6 +345,36 @@ unsigned Node::printParents() const
 	return d+1;
 }
 
+bool Node::isUserVar(const std::string& s) const
+{
+	return s.find("_t_") == s.npos && s.find("_n_") == s.npos && s.find("_STR_") == s.npos && s.find("_b_") == s.npos;
+}
+
+int Node::getArg(const std::string& s)
+{
+	if(isUserVar(s))
+	{
+		if(hasSymbol(s))
+		{
+			Symbol sym = getSymbol(s);
+			if(sym.arg < 0) return -1;
+			return sym.arg;
+		}
+	}
+	return -1;
+}
+
+std::string Node::getNameASM(const std::string& s)
+{
+	if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
+	{
+		int arg = getArg(s);
+		if(arg < 0) return s;
+		return "%xmm" + std::to_string(arg);
+	}
+	return s;
+}
+
 // ---------------------------------------------------------------------------------------------------------
 
 std::pair<BBlock*, std::string> Statement::convert(BBlock* out)
@@ -451,7 +483,7 @@ std::pair<BBlock*, std::string> Operation::convert(BBlock* out)
 
 	makeName();
 	std::pair<BBlock*, std::string> result(out, this->name);
-	result.first->instructions.push_back(ThreeAd(this->name, this->op, lhs->name, rhs->name, this->data.type, result.first));
+	result.first->instructions.push_back(ThreeAd(getNameASM(this->name), this->op, getNameASM(lhs->name), getNameASM(rhs->name), this->data.type, result.first));
 
 	data.name = this->name;
 	return result;
@@ -558,7 +590,7 @@ std::pair<BBlock*, std::string> AssignmentOne::convert(BBlock* out, bool shouldA
 		cIndex->convert(out);
 		std::string tblIndexVarI = cIndex->name;
 		this->data.type = Data::Type::TABLE;
-		result.first->instructions.push_back(ThreeAd(tblIndexVar, "storeAt", rhs->name, tblIndexVarI, Data::Type::TABLE, result.first));
+		result.first->instructions.push_back(ThreeAd(getNameASM(tblIndexVar), "storeAt", getNameASM(rhs->name), getNameASM(tblIndexVarI), Data::Type::TABLE, result.first));
 	}
 	else
 	{
@@ -603,7 +635,7 @@ std::pair<BBlock*, std::string> AssignmentOne::convert(BBlock* out, bool shouldA
 		}
 		if(shouldAddSym)
 			addSymbol(this->name, sym);
-		result.first->instructions.push_back(ThreeAd(this->name, "cpy", rhs->name, rhs->name, this->data.type, result.first));	
+		result.first->instructions.push_back(ThreeAd(getNameASM(this->name), "cpy", getNameASM(rhs->name), getNameASM(rhs->name), this->data.type, result.first));	
 	}	
 	
 	return result;
@@ -741,8 +773,8 @@ std::pair<BBlock*, std::string> For::convert(BBlock* out)
 		symOne.size = sizeof(double);
 		addSymbol(oneSym, symOne);
 	}
-	e->instructions.push_back(ThreeAd(this->name, "+", as->name, oneSym, as->data.type, e));
-	e->instructions.push_back(ThreeAd(as->name, "cpy", this->name, this->name, as->data.type, e));
+	e->instructions.push_back(ThreeAd(getNameASM(this->name), "+", getNameASM(as->name), getNameASM(oneSym), as->data.type, e));
+	e->instructions.push_back(ThreeAd(getNameASM(as->name), "cpy", getNameASM(this->name), getNameASM(this->name), as->data.type, e));
 	e->tExit = ifBlock;
 
 	// After each block, go back to start of forBlock.
@@ -831,7 +863,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 		if(lhs->name == "print")
 		{
 			addSymStr("_STR_S_NL", "%s\\n");
-			block->instructions.push_back(ThreeAd(this->name, "call", "printf_vnl", str->name, Data::Type::NIL, block));
+			block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vnl", getNameASM(str->name), Data::Type::NIL, block));
 			this->ret.type = Data::Type::NIL;
 			isPredefined = true;
 		}
@@ -845,7 +877,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 			if(lhs2->name == "write")
 			{
 				addSymStr("_STR_S", "%s");
-				block->instructions.push_back(ThreeAd(this->name, "call", "printf_v", str->name, Data::Type::NIL, block));
+				block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_v", getNameASM(str->name), Data::Type::NIL, block));
 				this->ret.type = Data::Type::NIL;
 				isPredefined = true;
 			}
@@ -880,13 +912,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
 						{
 							addSymStr("_STR_F_NL", "%.1f\\n");
-							block->instructions.push_back(ThreeAd(this->name, "call", "printf_fnl", s, Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_fnl", getNameASM(s), Data::Type::NIL, block));
 						}
 						else
 						{
 							addSymStr("_STR_F_NL", "%.1f\\n");
 							addSymStr("_STR_S_NL", "%s\\n");
-							block->instructions.push_back(ThreeAd(this->name, "call", "printf_vnl", s, Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vnl", getNameASM(s), Data::Type::NIL, block));
 						}
 					}
 					else
@@ -894,13 +926,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
 						{
 							addSymStr("_STR_F_T", "%.1f\\t");
-							block->instructions.push_back(ThreeAd(this->name, "call", "printf_ft", s, Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_ft", getNameASM(s), Data::Type::NIL, block));
 						}
 						else
 						{
 							addSymStr("_STR_F_T", "%.1f\\t");
 							addSymStr("_STR_S_T", "%s\\t");
-							block->instructions.push_back(ThreeAd(this->name, "call", "printf_vt", s, Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vt", getNameASM(s), Data::Type::NIL, block));
 						}
 					}
 					this->ret.type = Data::Type::NIL;
@@ -929,7 +961,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						
 						addSymStr("_STR_F", "%.1f");
 						addSymStr("_STR_S", "%s");
-						block->instructions.push_back(ThreeAd(this->name, "call", "printf_v", n->name, Data::Type::NIL, block));
+						block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_v", getNameASM(n->name), Data::Type::NIL, block));
 						this->ret.type = Data::Type::NIL;
 					}
 				}
@@ -945,7 +977,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 					// Read number
 					makeName();
 					addSymStr("_STR_SCAN_F", "%lf");
-					block->instructions.push_back(ThreeAd(this->name, "call", "scanf", "NUM", Data::Type::NUMBER, block));
+					block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "scanf", "NUM", Data::Type::NUMBER, block));
 					this->ret.type = Data::Type::NUMBER;
 				}
 			}
@@ -967,12 +999,12 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 					n->convert(block);
 					
 					// Assume NUMBER as return type.
-					block->instructions.push_back(ThreeAd(this->name, "call", lhs->name, n->name, Data::Type::NUMBER, block));
+					block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", getNameASM(lhs->name), getNameASM(n->name), Data::Type::NUMBER, block));
 				}
 				else
 				{
 					// Assume NUMBER as return type.
-					block->instructions.push_back(ThreeAd(this->name, "call", lhs->name, "NIL", Data::Type::NUMBER, block));
+					block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", getNameASM(lhs->name), "NIL", Data::Type::NUMBER, block));
 				}
 			}
 			else
@@ -1021,7 +1053,7 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 		s.size = sizeof(double);
 		std::string idxName = "_idx" + std::to_string(index);
 		this->addSymbol(idxName, s);
-		out->instructions.push_back(ThreeAd(sym.data.name, "storeAt", e.data.name, idxName, Data::Type::TABLE, out));
+		out->instructions.push_back(ThreeAd(getNameASM(sym.data.name), "storeAt", getNameASM(e.data.name), getNameASM(idxName), Data::Type::TABLE, out));
 		index += 1; // TODO: Change this when using asm. 
 	}
 	return result;
@@ -1043,7 +1075,7 @@ std::pair<BBlock*, std::string> TableIndex::convert(BBlock* out)
 		makeName();
 	}
 	
-	out->instructions.push_back(ThreeAd(this->name, "loadAt", var->name, index->name, Data::Type::NUMBER, out));
+	out->instructions.push_back(ThreeAd(getNameASM(this->name), "loadAt", getNameASM(var->name), getNameASM(index->name), Data::Type::NUMBER, out));
 
 	// Assume all data from a table are numbers.
 	this->data.type = Data::Type::NUMBER;
@@ -1071,7 +1103,7 @@ std::pair<BBlock*, std::string> Hash::convert(BBlock* out)
 	}
 
 	makeName();
-	out->instructions.push_back(ThreeAd(this->name, "cpy", sSym, sSym, Data::Type::NUMBER, out));
+	out->instructions.push_back(ThreeAd(getNameASM(this->name), "cpy", getNameASM(sSym), getNameASM(sSym), Data::Type::NUMBER, out));
 
 	this->data.type = Data::Type::NUMBER;
 	return result;
@@ -1108,12 +1140,15 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 		
 		if(nameList != nullptr)
 		{
+			// Add arguments.
+			int argCounter = 0;
 			Node* c = nameList->children.front();
 			while(c->children.empty() == false)
 			{
 				c->convert(funcBlock);
 				Symbol sym(Data::Type::NUMBER);
-				sym.size = 0;
+				sym.size = sizeof(double);
+				sym.arg = argCounter++;
 				addSymbol(c->name, sym);
 				sym.data.name = c->name;
 				funcBlock->funcArgs.push_back(sym);
@@ -1121,7 +1156,8 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 			}
 			c->convert(funcBlock);
 			Symbol sym(Data::Type::NUMBER);
-			sym.size = 0;
+			sym.size = sizeof(double);
+			sym.arg = argCounter++;
 			addSymbol(c->name, sym);
 			sym.data.name = c->name;
 			funcBlock->funcArgs.push_back(sym);
@@ -1154,7 +1190,7 @@ std::pair<BBlock*, std::string> Return::convert(BBlock* out)
 			out->tExit = block;
 		}
 		makeName();
-		block->instructions.push_back(ThreeAd(this->name, "ret", retExp->name, retExp->name, retExp->data.type, block));
+		block->instructions.push_back(ThreeAd(getNameASM(this->name), "ret", getNameASM(retExp->name), getNameASM(retExp->name), retExp->data.type, block));
 	}
 	else
 	{
@@ -1165,7 +1201,7 @@ std::pair<BBlock*, std::string> Return::convert(BBlock* out)
 		}
 		makeName();
 		// Assume NUMBER as return type.
-		block->instructions.push_back(ThreeAd(this->name, "ret", "NIL", "NIL", Data::Type::NUMBER, block));
+		block->instructions.push_back(ThreeAd(getNameASM(this->name), "ret", "NIL", "NIL", Data::Type::NUMBER, block));
 	}
 	
 	result.first = block;

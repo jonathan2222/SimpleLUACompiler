@@ -11,6 +11,7 @@ struct Symbol
 	Symbol() {}
 	Symbol(Data::Type type) { data.type = type; }
 	unsigned int size = 0;
+	int arg = -1; // arg < 0: no argument, else argument at position arg.
 
 	std::string toString() const;
 

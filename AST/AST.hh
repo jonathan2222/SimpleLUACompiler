@@ -75,6 +75,10 @@ private:
 	static unsigned counterName;
 
 protected:
+	bool isUserVar(const std::string& s) const;
+	int getArg(const std::string& s);
+	std::string getNameASM(const std::string& s);
+
 	bool hasName = false;
 };
 

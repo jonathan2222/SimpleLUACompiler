@@ -336,18 +336,20 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         }
         else
         {
+            // TODO: save %xmm0 and %xmm1
             std::string s;
             s += "\t# " + this->name + " := " + this->lhs + " ^ " + this->rhs + "\n";
-            //s += "\tpush %xmm0\n";
-            //s += "\tpush %xmm1\n";
-            s += "\tsubq $8, %rsp\n";
+            s += "\tsubq $16, %rsp\n";
+            s += "\tmovsd %xmm0, 8(%rsp)\n";
+            s += "\tmovsd %xmm1, (%rsp)\n";
+            
             s += "\tmovsd " + this->lhs + ", %xmm0\n";
             s += "\tmovsd " + this->rhs + ", %xmm1\n";
             s += "\tcall pow\n";
             s += "\tmovsd %xmm0, " + this->name + "\n";
-            s += "\taddq $8, %rsp\n";
-            //s += "\tpop %xmm1\n";
-            //s += "\tpop %xmm0\n";
+            
+            s += "\tmovsd 8(%rsp), %xmm0\n";
+            s += "\taddq $16, %rsp\n";
             return s;
         }
 	}
@@ -416,15 +418,15 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         {
             std::string s;
             s += "\t# " + this->name + " := " + this->lhs + " % " + this->rhs + "\n";
-            s += "\tmovsd " + this->lhs + ", %xmm0\n";
-            s += "\tmovsd " + this->rhs + ", %xmm1\n";
-            s += "\tmovsd %xmm0, %xmm2\n";
-            s += "\tdivsd %xmm1, %xmm2\n";                  // xmm2 = xmm0 / xmm1    
-            s += "\tcvttsd2siq %xmm2, %r12\n";              // rax = (long int)xmm2
-            s += "\tcvtsi2sdq %r12, %xmm2\n";              // xmm2 = rax
-            s += "\tmulsd %xmm1, %xmm2\n";                  // xmm2 = xmm1 * xmm2
-            s += "\tsubsd %xmm2, %xmm0\n";                  // xmm0 = xmm0 - xmm2
-            s += "\tmovsd %xmm0, " + this->name + "\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
+            s += "\tmovsd " + this->rhs + ", %xmm6\n";
+            s += "\tmovsd %xmm5, %xmm7\n";
+            s += "\tdivsd %xmm6, %xmm7\n";                  // xmm7 = xmm5 / xmm6    
+            s += "\tcvttsd2siq %xmm7, %r12\n";              // rax = (long int)xmm7
+            s += "\tcvtsi2sdq %r12, %xmm7\n";               // xmm7 = rax
+            s += "\tmulsd %xmm6, %xmm7\n";                  // xmm7 = xmm6 * xmm7
+            s += "\tsubsd %xmm7, %xmm5\n";                  // xmm5 = xmm5 - xmm7
+            s += "\tmovsd %xmm5, " + this->name + "\n";
             return s;
         }
 	}
@@ -437,9 +439,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " == " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tje " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -464,9 +466,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " ~= " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tjne " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -491,9 +493,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " <= " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tjbe " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -518,9 +520,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " >= " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tjae " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -545,9 +547,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " < " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tjb " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -572,9 +574,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             s += "\t# " + this->lhs + " > " + this->rhs + "\n";
             if(this->type == Data::Type::NUMBER)
             {
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd " + this->rhs + ", %xmm1\n";
-                s += "\tucomisd %xmm1, %xmm0\n";       // xmm0 - xmm1
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd " + this->rhs + ", %xmm6\n";
+                s += "\tucomisd %xmm6, %xmm5\n";       // xmm5 - xmm6
                 s += "\tja " + this->parent->tExit->name + "\n";
                 s += "\tjmp " + this->parent->fExit->name + "\n";
             }
@@ -638,8 +640,8 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             {
                 std::string s;
                 s += "\t# " + this->name + " := " + this->lhs + " [NUM]\n";
-                s += "\tmovsd " + this->lhs + ", %xmm0\n";
-                s += "\tmovsd %xmm0, " + this->name + "\n";
+                s += "\tmovsd " + this->lhs + ", %xmm5\n";
+                s += "\tmovsd %xmm5, " + this->name + "\n";
                 return s;
             }
             else if(this->type == Data::Type::STRING || this->type == Data::Type::BOOL)
@@ -681,12 +683,12 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         {
             std::string s;
             s += "\t# " + this->name + "[(long int)" + this->rhs + " - 1] = " + this->lhs + ";\n";
-            s += "\tmovsd " + this->rhs + ", %xmm0\n";
-            s += "\tcvttsd2siq %xmm0, %r12\n";
+            s += "\tmovsd " + this->rhs + ", %xmm5\n";
+            s += "\tcvttsd2siq %xmm5, %r12\n";
             s += "\tsubq $1, %r12\n";
-            s += "\tmovsd " + this->lhs + ", %xmm0\n";
+            s += "\tmovsd " + this->lhs + ", %xmm5\n";
             s += "\tlea " + this->name + ", %r13\n";
-            s += "\tmovsd %xmm0, (%r13, %r12, 8)\n";
+            s += "\tmovsd %xmm5, (%r13, %r12, 8)\n";
             return s;
         }
     }
@@ -719,12 +721,12 @@ std::string ThreeAd::toTarget(Symbols* symbols)
         {
             std::string s;
             s += "\t# " + this->name + " = " + this->lhs + "[(long int)" + this->rhs + " - 1];\n";
-            s += "\tmovsd " + this->rhs + ", %xmm0\n";
-            s += "\tcvttsd2siq %xmm0, %r12\n";
+            s += "\tmovsd " + this->rhs + ", %xmm5\n";
+            s += "\tcvttsd2siq %xmm5, %r12\n";
             s += "\tsubq $1, %r12\n";
             s += "\tlea " + this->lhs + ", %r13\n";
-            s += "\tmovsd (%r13, %r12, 8), %xmm0\n";
-            s += "\tmovsd %xmm0, " + this->name + "\n";
+            s += "\tmovsd (%r13, %r12, 8), %xmm5\n";
+            s += "\tmovsd %xmm5, " + this->name + "\n";
             return s;
         }
     }
@@ -772,7 +774,9 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 bool isDouble = sym.data.type != Data::Type::STRING;
                 std::string s;
                 s += "\t# printf(" + str  + ", " + this->rhs + ");\n";
+                s += "\t# Save %rdi and %rsi to the stack.\n";
                 s += "\tpush %rdi\n";
+                s += "\tpush %rsi\n";
                 if(isDouble == false)
                 {
                     //s += "\tpush %rax\n";
@@ -780,7 +784,13 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 }
                 s += "\tleaq " + str + ", %rdi\n";
                 if(isDouble)
-                s += "\tmovsd " + this->rhs + ", %xmm0\n";
+                {
+                    // Save %xmm0 to the stack.
+                    s += "\t# Save %xmm0 to the stack.\n";
+                    s += "\tsubq $8, %rsp\n";
+                    s += "\tmovsd %xmm0, (%rsp)\n";
+                    s += "\tmovsd " + this->rhs + ", %xmm0\n";
+                }
                 else 
                 {
                     if(sym.data.type == Data::Type::BOOL)
@@ -790,16 +800,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 if(isDouble)
                 {
                     s += "\tmovq $1, %rax\n";
-                    //s += "\tsubq $8, %rsp\n";
                 }
                 else s += "\txorq %rax, %rax\n";
                 s += "\tcall printf\n";
-                if(isDouble == false)
+                if(isDouble != false)
                 {
-                    //s += "\tpop %rsi\n";
-                    //s += "\tpop %rax\n";
+                    // Retrive %xmm0 from the stack.
+                    s += "\t# Retrive %xmm0 from the stack.\n";
+                    s += "\tmovsd (%rsp), %xmm0\n";
+                    s += "\taddq $8, %rsp\n";
                 }
-                //else s += "\taddq $8, %rsp\n";
+                s += "\t# Pop %rdi and %rsi from the stack.\n";
+                s += "\tpop %rsi\n";
                 s += "\tpop %rdi\n";
                 return s;
             }
@@ -831,12 +843,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
             {
                 std::string s;
                 s += "\t# printf(" + str  + ", " + this->rhs + ");\n";
+                s += "\tpush %rdi\n";
+                s += "\tsubq $16, %rsp\n";
+                s += "\tmovsd %xmm0, 8(%rsp)\n";
+
                 s += "\tleaq " + str + ", %rdi\n";
                 s += "\tmovsd " + this->rhs + ", %xmm0\n";
                 s += "\tmovq $1, %rax\n";
-                s += "\tsubq $8, %rsp\n";
                 s += "\tcall printf\n";
-                s += "\taddq $8, %rsp\n";
+
+                s += "\tmovsd 8(%rsp), %xmm0\n";
+                s += "\taddq $16, %rsp\n";
+                s += "\tpop %rdi\n";
                 return s;
             }
         };
@@ -889,12 +907,18 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 str = "_STR_SCAN_F";
                 std::string s;
                 s += "\t# scanf(_STR_SCAN_F, " + this->rhs + ");\n";
+                s += "\tpushq %rdi\n";
+                s += "\tpushq %rsi\n";
+
                 s += "\tleaq " + str + ", %rdi\n";
                 s += "\tleaq " + this->name + ", %rsi\n";
                 s += "\tsubq $8, %rsp\n";
                 s += "\tmovq $1, %rax\n";
                 s += "\tcall scanf\n";
                 s += "\taddq $8, %rsp\n";
+
+                s += "\tpopq %rsi\n";
+                s += "\tpopq %rdi\n";
                 return s;
             }
         }
@@ -912,9 +936,15 @@ std::string ThreeAd::toTarget(Symbols* symbols)
                 {
                     std::string s;
                     s += "\t# " + this->name + " := " + this->lhs  + "(" + this->rhs + ");\n";
+                    s += "\tsubq $16, %rsp\n";
+                    s += "\tmovsd %xmm0, 8(%rsp)\n";
+
                     s += "\tmovsd " + this->rhs + ", %xmm0\n";
                     s += "\tcall " + this->lhs + "\n";
                     s += "\tmovsd %xmm0, " + this->name + "\n";
+
+                    s += "\tmovsd 8(%rsp), %xmm0\n";
+                    s += "\taddq $16, (%rsp)\n";
                     return s;
                 }
                 else
@@ -1021,17 +1051,31 @@ bool BBlock::hasReturn() const
 
 void BBlock::fetchVars(VMap& vmap, Symbols* symbols)
 {
+    auto addVar = [&](VMap& vmap, ThreeAd& i)
+    {
+        if(vmap.find(i.type) == vmap.end())
+        {
+            VSet vSet;
+            vmap.insert({i.type, vSet});
+        }
+        VSet& vset = vmap[i.type];
+        vset.insert(i.name);
+    };
+
     for(ThreeAd& i : this->instructions)
     {
         if(i.type != Data::Type::NIL && symbols->map.find(i.name) == symbols->map.end() && i.op != "ret")
         {
-            if(vmap.find(i.type) == vmap.end())
+            if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
             {
-                VSet vSet;
-                vmap.insert({i.type, vSet});
+                // Only add constants.
+                //if(i.name.find("_n_") != i.name.npos || i.name.find("_s_") != i.name.npos || i.name.find("_b_") != i.name.npos)
+                addVar(vmap, i);
             }
-            VSet& vset = vmap[i.type];
-            vset.insert(i.name);
+            else
+            {
+                addVar(vmap, i);
+            }
         }
     }
 }
@@ -1104,6 +1148,19 @@ VMap fetchVars(BBlock* start)
     }
 
     return varMap;
+}
+
+void initFunctionASM(std::ofstream& file, BBlock* start)
+{
+    for(auto& e : start->symbols->map)
+    {
+        Symbol& sym = e.second;
+        if(sym.arg >= 0) // Is argument
+        {
+            // Assume numbers.
+            
+        }
+    }
 }
 
 void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude)

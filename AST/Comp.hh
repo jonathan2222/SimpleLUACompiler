@@ -69,6 +69,7 @@ std::string getType(Data::Type type);
 
 VMap fetchVars(BBlock* start);
 
+void initFunctionASM(std::ofstream& file, BBlock* start);
 void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude = std::vector<Symbol>());
 void initTmpVariables(std::ofstream& file, BBlock* start);
 void dumpCFGInstructions(std::ofstream& file, BBlock* start);
