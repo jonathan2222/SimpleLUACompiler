@@ -929,6 +929,7 @@ std::string ThreeAd::toTarget(Symbols* symbols, unsigned vSize)
             {
                 std::string s;
                 s += "\taddq $" + std::to_string(vSize) + ", %rsp\n";
+                s += cleanup();
                 s += "\tret\n";
                 return s;
             }  
@@ -941,6 +942,7 @@ std::string ThreeAd::toTarget(Symbols* symbols, unsigned vSize)
                 std::string s;
                 s += "\tmovsd " + getName(this->lhs) + ", %xmm0\n";
                 s += "\taddq $" + std::to_string(vSize) + ", %rsp\n";
+                s += cleanup();
                 s += "\tret\n";
                 return s;
             }
@@ -1042,15 +1044,9 @@ void BBlock::fetchVars(VMap& vmap, Symbols* symbols)
         if(i.type != Data::Type::NIL && symbols->map.find(i.name) == symbols->map.end() && i.op != "ret")
         {
             if(compLevel == CompileLevel::B || compLevel == CompileLevel::A)
-            {
-                // Only add constants.
-                //if(i.name.find("_n_") != i.name.npos || i.name.find("_s_") != i.name.npos || i.name.find("_b_") != i.name.npos)
                 addVar(vmap, i);
-            }
             else
-            {
                 addVar(vmap, i);
-            }
         }
     }
 }
@@ -1123,19 +1119,6 @@ VMap fetchVars(BBlock* start)
     }
 
     return varMap;
-}
-
-void initFunctionASM(std::ofstream& file, BBlock* start)
-{
-    for(auto& e : start->symbols->map)
-    {
-        Symbol& sym = e.second;
-        if(sym.arg >= 0) // Is argument
-        {
-            // Assume numbers.
-            
-        }
-    }
 }
 
 void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude, std::unordered_map<std::string, Symbol>* include)
@@ -1323,6 +1306,38 @@ std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::ve
 
 // ---------------------------------------------------------------------------------------------------------
 
+std::string setup()
+{
+    std::string s;
+    s += "\tsubq $32, %rsp\n";
+    s += "\tmovsd %xmm5, (%rsp)\n";
+    s += "\tmovsd %xmm6, 8(%rsp)\n";
+    s += "\tmovsd %xmm7, 16(%rsp)\n";
+    s += "\tpushq %r12\n";
+    s += "\tpushq %r13\n";
+    s += "\tpushq %rdi\n";
+    s += "\tpushq %rsi\n";
+    return s;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
+std::string cleanup()
+{
+    std::string s;
+    s += "\tpopq %rsi\n";
+    s += "\tpopq %rdi\n";
+    s += "\tpopq %r13\n";
+    s += "\tpopq %r12\n";
+    s += "\tmovsd 16(%rsp), %xmm7\n";
+    s += "\tmovsd 8(%rsp), %xmm6\n";
+    s += "\tmovsd (%rsp), %xmm5\n";
+    s += "\taddq $32, %rsp\n";
+    return s;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
 {
     std::ofstream file;
@@ -1355,12 +1370,13 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
         file << ".text\n.globl main\nmain:\n";
         unsigned vSize = getMaxTmpVSize(start);
         // Move stack pointer to hold local variables.
+        file <<setup();
         file << "\tsubq $" << vSize << ", %rsp\n"; 
         // Dump all block in the CFG.
         dumpCFGInstructions(file, start, vSize);
-
         file << "\taddq $" << vSize << ", %rsp" << std::endl;
         file << "\txorq %rax, %rax" << std::endl;
+        file << cleanup();
         file << "\tret" << std::endl;
 
         for(auto f : functionMap)
@@ -1368,9 +1384,10 @@ void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks)
             vSize = f.second->vSize;
             file << f.first.data.name << ":" << std::endl;
             // Move stack pointer to hold local variables.
+            file << setup();
             file << "\tsubq $" << vSize << ", %rsp\n";
             // Dump all block in the CFG.
-            dumpCFGInstructions(file, f.second, vSize);            
+            dumpCFGInstructions(file, f.second, vSize);
         }
     }
     else
