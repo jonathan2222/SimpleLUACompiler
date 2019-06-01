@@ -34,7 +34,7 @@ std::string ThreeAd::toTarget(Symbols* symbols, unsigned vSize)
     };
 
     auto getName = [&](std::string s, unsigned offset = 0)->std::string {
-        if(s.find("_t_") != s.npos)
+        if(s.find("_t_") != s.npos && (compLevel == CompileLevel::B || compLevel == CompileLevel::A))
         {
             s = s.substr(3, s.size()-3);
             unsigned n = stoi(s) + offset;
@@ -848,7 +848,7 @@ std::string ThreeAd::toTarget(Symbols* symbols, unsigned vSize)
             {
                 if(getName(this->rhs) == "NUM")
                     str = symbols->get("_STR_SCAN_F").data.s;
-                return "\tscanf(\"" + str  + "\", " + getName(this->name) + ");\n";
+                return "\tscanf(\"" + str  + "\", &" + getName(this->name) + ");\n";
             }
             else if(compLevel == CompileLevel::C)
             {
@@ -1092,8 +1092,8 @@ std::string getType(Data::Type type)
     if(type == Data::Type::STRING)
         return "char*";
     if(type == Data::Type::BOOL)
-        return "long int";
-    return Data::typeToString(type);
+        return "double";
+    return "double";
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1168,7 +1168,7 @@ void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclu
             else if(sym.data.type == Data::Type::STRING)
                 file << "\t" << cStr << "char " << e.first << "[] = \"" + sym.data.s + "\";" << std::endl;
             else if(sym.data.type == Data::Type::BOOL)
-                file << "\t" << cStr << "long int " << e.first << " = " << (long int)sym.data.b << ";" << std::endl;
+                file << "\t" << cStr << "double " << e.first << " = " << (double)sym.data.b << ";" << std::endl;
             else if(sym.data.type == Data::Type::TABLE)
                 file << "\t" << cStr << "double " << e.first << "[" << (long int)(sym.size/sizeof(double)) << "];" << std::endl;
         }
@@ -1195,36 +1195,24 @@ void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclu
 
 void initTmpVariables(std::ofstream& file, BBlock* start)
 {
-    auto varTypeToFile = [&file](VMap::iterator it)->void {
+    auto varTypeToFile = [&file](VMap::iterator it, VSet& set)->void {
         file << "\t" << getType(it->first) << " ";
         std::set<std::string>::iterator sIt = it->second.begin();
-        for(int i = 0; sIt != it->second.end(); sIt++, i++)
-            file << (i==0? "" : ", ") << *sIt;
+        for(int i = 0; sIt != it->second.end(); sIt++)
+        {
+            if(set.find(*sIt) == set.end())
+                file << (i++==0? "" : ", ") << *sIt;
+        }
+        set.insert(it->second.begin(), it->second.end());
         file << ";" << std::endl;
     };
-    
-    auto varTypeToFileBA = [&](VMap::iterator it)->void {
-        std::set<std::string>::iterator sIt = it->second.begin();
-        for(int i = 0; sIt != it->second.end(); sIt++, i++)
-        {
-            if(it->first == Data::Type::NUMBER)
-                file << *sIt << ":\t.double 0.0" << std::endl;
-            else if(it->first == Data::Type::BOOL)
-                file << *sIt << ":\t.quad 0" << std::endl;
-        }
-    };
 
-    if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
-        file << "\t// Initialize temp-variables." << std::endl;
+    file << "\t// Initialize temp-variables." << std::endl;
+    std::set<std::string> set;
     VMap vMap = fetchVars(start);
     VMap::iterator it = vMap.begin();
     for(;it != vMap.end(); it++)
-    {
-        if(compLevel != CompileLevel::B && compLevel != CompileLevel::A)
-            varTypeToFile(it);
-        else
-            varTypeToFileBA(it);
-    }
+        varTypeToFile(it, set);
     file << std::endl;
 }
 
