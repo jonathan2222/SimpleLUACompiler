@@ -34,7 +34,7 @@ public:
     void dump();
     std::string cfg();
 
-    std::string toTarget(Symbols* symbols);
+    std::string toTarget(Symbols* symbols, unsigned vSize);
 };
 
 
@@ -48,15 +48,17 @@ public:
     std::list<ThreeAd> instructions;
     BBlock *tExit, *fExit;
     std::string name;
+    unsigned id;
+    unsigned vSize = 0; // Size of total local variables
 
     std::set<std::string> vars;
 
-    BBlock() : tExit(NULL), fExit(NULL), name("blk" + std::to_string(nCounter++)) { }
+    BBlock() : tExit(NULL), fExit(NULL) { id = nCounter; name = "blk" + std::to_string(nCounter++); }
 
     void dump();
     std::string cfg();
 
-    std::string toTarget(Symbols* symbols);
+    std::string toTarget(Symbols* symbols, unsigned vSize);
     Symbols* symbols = nullptr;
 
     bool hasReturn() const;
@@ -70,9 +72,10 @@ std::string getType(Data::Type type);
 VMap fetchVars(BBlock* start);
 
 void initFunctionASM(std::ofstream& file, BBlock* start);
-void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude = std::vector<Symbol>());
+void initVariables(std::ofstream& file, BBlock* start, std::vector<Symbol> exclude = std::vector<Symbol>(), std::unordered_map<std::string, Symbol>* include = nullptr);
 void initTmpVariables(std::ofstream& file, BBlock* start);
-void dumpCFGInstructions(std::ofstream& file, BBlock* start);
+unsigned getMaxTmpVSize(BBlock* start);
+void dumpCFGInstructions(std::ofstream& file, BBlock* start, unsigned vSize);
 std::vector<std::pair<Symbol, BBlock*>> getFunctionMap(Symbols* symbols, std::vector<BBlock*>& functionBlocks);
 
 void dumpToTarget(BBlock* start, std::vector<BBlock*> funcBlocks);

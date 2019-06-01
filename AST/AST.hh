@@ -21,7 +21,7 @@ public:
 	Node(const std::string& tag, const Data& data);
 	virtual ~Node();
 
-	virtual std::string makeName(const std::string& prefix = "_t_");
+	virtual std::string makeName(BBlock* block, const std::string& prefix = "_t_");
 	std::string makeId();
 	
 	void dump(int depth=0);
@@ -72,7 +72,9 @@ public:
 
 private:
 	static unsigned counterId;
-	static unsigned counterName;
+	static unsigned counterConstants;
+	// Holds the block id as the key and a counter as the value.
+	static std::unordered_map<unsigned, unsigned> counterNames;
 
 protected:
 	bool isUserVar(const std::string& s) const;
@@ -105,7 +107,7 @@ public:
 	Constant(const std::string& s) : Expression("Constant", Data("NO_NAME", s)) {}
 	virtual ~Constant() {}
 
-	std::string makeName(const std::string& prefix = "_t_") override;
+	std::string makeName(BBlock* block, const std::string& prefix = "_t_") override;
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
 };
 
@@ -117,7 +119,7 @@ public:
 	Var(const std::string& name) : Expression("Var", Data(name)) { }
 	virtual ~Var() {}
 
-	std::string makeName(const std::string& prefix = "_t_") override;
+	std::string makeName(BBlock* block, const std::string& prefix = "_t_") override;
 	virtual std::pair<BBlock*, std::string> convert(BBlock* out) override;
 };
 

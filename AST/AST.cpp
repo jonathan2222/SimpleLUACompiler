@@ -9,7 +9,8 @@
 extern CompileLevel compLevel;
 
 unsigned Node::counterId = 0;
-unsigned Node::counterName = 0;
+unsigned Node::counterConstants = 0;
+std::unordered_map<unsigned, unsigned> Node::counterNames = { {0, 0} };
 
 std::string strSides(const std::string str, std::string c) 
 {
@@ -19,7 +20,6 @@ std::string strSides(const std::string str, std::string c)
 Node::Node(const std::string& tag)
 {
 	this->tag = tag;
-	makeName();
 	makeId();
 }
 
@@ -27,7 +27,6 @@ Node::Node(const std::string& tag, const Data& data)
 {
 	this->tag = tag;
 	this->data = data;
-	makeName();
 	makeId();
 
 	if(data.type == Data::Type::SCOPE || data.type == Data::Type::FUNCTION)
@@ -44,9 +43,22 @@ Node::~Node()
 		delete this->symbols;
 }
 
-std::string Node::makeName(const std::string& prefix)
+std::string Node::makeName(BBlock* block, const std::string& prefix)
 {
-	this->name = prefix + std::to_string(++counterName);
+	if(prefix == "_t_")
+	{
+		if(counterNames.find(block->id) == counterNames.end())
+			counterNames[block->id] = 0;
+		unsigned& counter = counterNames[block->id];
+		this->name = prefix + std::to_string(counter);
+		counter += sizeof(double);
+		block->vSize = counter;
+	}
+	else
+	{
+		this->name = prefix + std::to_string(counterConstants++);
+	}
+	
 	return this->name;
 }
 
@@ -389,14 +401,14 @@ std::pair<BBlock*, std::string> Statement::convert(BBlock* out)
 
 std::pair<BBlock*, std::string> Expression::convert(BBlock* out)
 {
-	makeName();
+	makeName(out);
 	std::pair<BBlock*, std::string> result(nullptr, this->name);
 	return result;
 }
 
 // ---------------------------------------------------------------------------------------------------------
 
-std::string Constant::makeName(const std::string& prefix)
+std::string Constant::makeName(BBlock* block, const std::string& prefix)
 {
 	this->name = data.valToString();
 	if(data.type == Data::Type::NUMBER)
@@ -410,7 +422,7 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 	// If the constant is a string => make a symbol for it.
 	if(data.type == Data::Type::STRING)
 	{
-		::Expression::makeName("_s_");
+		::Expression::makeName(out, "_s_");
 		Symbol sym(Data::Type::STRING);
 		sym.size = (this->data.s.size()+1)*sizeof(char);
 		sym.data.s = this->data.s;
@@ -418,8 +430,7 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 	}
 	else if(data.type == Data::Type::BOOL)
 	{
-		//makeName();
-		::Expression::makeName("_b_");
+		::Expression::makeName(out, "_b_");
 		Symbol sym(Data::Type::BOOL);
 		sym.size = sizeof(long int);
 		sym.data.b = this->data.b;
@@ -427,7 +438,7 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 	}
 	else if(data.type == Data::Type::NUMBER)
 	{
-		::Expression::makeName("_n_");
+		::Expression::makeName(out, "_n_");
 		Symbol sym(Data::Type::NUMBER);
 		sym.size = sizeof(double);
 		sym.data.f = this->data.f;
@@ -441,7 +452,7 @@ std::pair<BBlock*, std::string> Constant::convert(BBlock* out)
 
 // ---------------------------------------------------------------------------------------------------------
 
-std::string Var::makeName(const std::string& prefix)
+std::string Var::makeName(BBlock* block, const std::string& prefix)
 {
 	this->name = data.name;
 	return this->name;
@@ -449,7 +460,7 @@ std::string Var::makeName(const std::string& prefix)
 
 std::pair<BBlock*, std::string> Var::convert(BBlock* out)
 {
-	makeName();
+	makeName(out);
 	std::pair<BBlock*, std::string> result(nullptr, this->name);
 	if(hasSymbol(this->name) != false)
 	{
@@ -481,7 +492,7 @@ std::pair<BBlock*, std::string> Operation::convert(BBlock* out)
 		this->data.type = lhs->data.type;
 	}
 
-	makeName();
+	makeName(out);
 	std::pair<BBlock*, std::string> result(out, this->name);
 	result.first->instructions.push_back(ThreeAd(getNameASM(this->name), this->op, getNameASM(lhs->name), getNameASM(rhs->name), this->data.type, result.first));
 
@@ -501,6 +512,8 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 	auto vIt = var_list->children.begin();
 	auto eIt = exp_list->children.begin();
 
+	std::vector<std::string> names;
+
 	for(;vIt != var_list->children.end(); vIt++, eIt++)
 	{
 		Expression* lhs = dynamic_cast<Expression*>(*vIt);
@@ -518,8 +531,10 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		{
 			// Make a assignment for each 'part'
 			AssignmentOne* as = new AssignmentOne();
-			Var* v = new Var("_tmp" + lhs->name);
-			v->makeName();
+			makeName(out);
+			names.push_back(this->name);
+			Var* v = new Var(this->name);
+			v->makeName(out);
 			as->addChild(v);
 			rhs->convert(out);
 			as->addChild(rhs);
@@ -530,7 +545,7 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 
 	vIt = var_list->children.begin();
 	eIt = exp_list->children.begin();
-	for(; vIt != var_list->children.end(); vIt++, eIt++)
+	for(int i = 0; vIt != var_list->children.end(); vIt++, eIt++)
 	{
 		Expression* lhs = dynamic_cast<Expression*>(*vIt);
 		Expression* rhs = dynamic_cast<Expression*>(*eIt);
@@ -538,8 +553,8 @@ std::pair<BBlock*, std::string> Assignment::convert(BBlock* out)
 		{
 			AssignmentOne* as = new AssignmentOne();
 			as->addChild(lhs);
-			Var* e = new Var("_tmp" + lhs->name);
-			e->makeName();
+			Var* e = new Var(names[i++]);
+			e->makeName(out);
 			e->convert(out);
 			e->data.type = rhs->data.type;
 			e->ret = rhs->ret;
@@ -652,8 +667,6 @@ std::pair<BBlock*, std::string> Paren::convert(BBlock* out)
 
 	this->name = lhs->name;
 	this->data.type = lhs->data.type;
-	//makeName();
-	//result.first->instructions.push_back(ThreeAd(this->name, "cpy", lhs->name, lhs->name));
 
 	return result;
 }
@@ -670,9 +683,10 @@ std::pair<BBlock*, std::string> If::convert(BBlock* out)
 	{
 		Node* el = this;
 		BBlock* elIn = new BBlock();
+		
 		BBlock* elOut = el->convert(elIn).first;
 		out->tExit = elIn;	
-	
+
 		BBlock* end = new BBlock();
 		elOut->tExit = end;
 
@@ -763,7 +777,7 @@ std::pair<BBlock*, std::string> For::convert(BBlock* out)
 	BBlock* e = ifBlock;
 	while(e->tExit != end)
 		e = e->tExit;
-	makeName();
+	makeName(e);
 	
 	std::string oneSym = "_n_ONE";
 	if(hasSymbol(oneSym) == false)
@@ -857,13 +871,12 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 	if(str != nullptr)
 	{
 		str->convert(block);
-		makeName();
 		
 		// Print when only string as an argument.
 		if(lhs->name == "print")
 		{
 			addSymStr("_STR_S_NL", "%s\\n");
-			block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vnl", getNameASM(str->name), Data::Type::NIL, block));
+			block->instructions.push_back(ThreeAd("", "call", "printf_vnl", getNameASM(str->name), Data::Type::NIL, block));
 			this->ret.type = Data::Type::NIL;
 			isPredefined = true;
 		}
@@ -877,7 +890,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 			if(lhs2->name == "write")
 			{
 				addSymStr("_STR_S", "%s");
-				block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_v", getNameASM(str->name), Data::Type::NIL, block));
+				block->instructions.push_back(ThreeAd("", "call", "printf_v", getNameASM(str->name), Data::Type::NIL, block));
 				this->ret.type = Data::Type::NIL;
 				isPredefined = true;
 			}
@@ -902,8 +915,6 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 				for(Node* n : exp_list->children)
 				{
 					cn++;
-					// New name each iteration.
-					makeName();
 					n->convert(block);
 					
 					std::string s = n->name;
@@ -912,13 +923,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
 						{
 							addSymStr("_STR_F_NL", "%.1f\\n");
-							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_fnl", getNameASM(s), Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd("", "call", "printf_fnl", getNameASM(s), Data::Type::NIL, block));
 						}
 						else
 						{
 							addSymStr("_STR_F_NL", "%.1f\\n");
 							addSymStr("_STR_S_NL", "%s\\n");
-							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vnl", getNameASM(s), Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd("", "call", "printf_vnl", getNameASM(s), Data::Type::NIL, block));
 						}
 					}
 					else
@@ -926,13 +937,13 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 						if(s[0] == '_' && s[1] == 't' && s[2] == '_')
 						{
 							addSymStr("_STR_F_T", "%.1f\\t");
-							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_ft", getNameASM(s), Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd("", "call", "printf_ft", getNameASM(s), Data::Type::NIL, block));
 						}
 						else
 						{
 							addSymStr("_STR_F_T", "%.1f\\t");
 							addSymStr("_STR_S_T", "%s\\t");
-							block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_vt", getNameASM(s), Data::Type::NIL, block));
+							block->instructions.push_back(ThreeAd("", "call", "printf_vt", getNameASM(s), Data::Type::NIL, block));
 						}
 					}
 					this->ret.type = Data::Type::NIL;
@@ -955,13 +966,11 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 					for(Node* n : exp_list->children)
 					{
 						cn++;
-						// New name each iteration.
-						makeName();
 						n->convert(block);
 						
 						addSymStr("_STR_F", "%.1f");
 						addSymStr("_STR_S", "%s");
-						block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "printf_v", getNameASM(n->name), Data::Type::NIL, block));
+						block->instructions.push_back(ThreeAd("", "call", "printf_v", getNameASM(n->name), Data::Type::NIL, block));
 						this->ret.type = Data::Type::NIL;
 					}
 				}
@@ -975,7 +984,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 				if(child->data.s == "*number")
 				{
 					// Read number
-					makeName();
+					makeName(block);
 					addSymStr("_STR_SCAN_F", "%lf");
 					block->instructions.push_back(ThreeAd(getNameASM(this->name), "call", "scanf", "NUM", Data::Type::NUMBER, block));
 					this->ret.type = Data::Type::NUMBER;
@@ -990,7 +999,7 @@ std::pair<BBlock*, std::string> FunctionCall::convert(BBlock* out)
 			{
 				Symbol sym = getSymbol(lhs->name);
 
-				makeName();
+				makeName(block);
 				Node* exp_list = args->children.front();
 				if(exp_list->tag == "Exp_list")
 				{
@@ -1027,7 +1036,6 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out)
 	// All test-cases uses constants only => I will only uses them too.
 	
 	// Construct array.
-	makeName();
 	for (Node* c : this->children)
 	{
 		Node* c2 = c->children.front();
@@ -1054,7 +1062,7 @@ std::pair<BBlock*, std::string> Table::convert(BBlock* out, const Symbol& sym)
 		std::string idxName = "_idx" + std::to_string(index);
 		this->addSymbol(idxName, s);
 		out->instructions.push_back(ThreeAd(getNameASM(sym.data.name), "storeAt", getNameASM(e.data.name), getNameASM(idxName), Data::Type::TABLE, out));
-		index += 1; // TODO: Change this when using asm. 
+		index += 1;
 	}
 	return result;
 }
@@ -1069,11 +1077,7 @@ std::pair<BBlock*, std::string> TableIndex::convert(BBlock* out)
 	Expression* index = dynamic_cast<Expression*>(this->children.back());
 	index->convert(out);
 
-	if(this->hasName == false)
-	{
-		this->hasName = true;
-		makeName();
-	}
+	makeName(out);
 	
 	out->instructions.push_back(ThreeAd(getNameASM(this->name), "loadAt", getNameASM(var->name), getNameASM(index->name), Data::Type::NUMBER, out));
 
@@ -1091,9 +1095,9 @@ std::pair<BBlock*, std::string> Hash::convert(BBlock* out)
 	Expression* child = dynamic_cast<Expression*>(this->children.front());
 	child->convert(out);
 
-	// If it would have been a more general case, than I would have not fetched the size at runtime, but instead use a separet instruction for it. 
+	// If it would have been a more general case, than I would have not fetched the size at runtime, but instead use a instruction for it. 
 	unsigned int size = getSymbol(child->name).size/sizeof(double);
-	std::string sSym = "_n_" + std::to_string(size);
+	std::string sSym = "_n_SIZE_" + std::to_string(size);
 	if(hasSymbol(sSym) == false)
 	{
 		Symbol symOne(Data::Type::NUMBER);
@@ -1101,8 +1105,8 @@ std::pair<BBlock*, std::string> Hash::convert(BBlock* out)
 		symOne.size = sizeof(double);
 		addSymbol(sSym, symOne);
 	}
-
-	makeName();
+	
+	makeName(out);
 	out->instructions.push_back(ThreeAd(getNameASM(this->name), "cpy", getNameASM(sSym), getNameASM(sSym), Data::Type::NUMBER, out));
 
 	this->data.type = Data::Type::NUMBER;
@@ -1121,8 +1125,10 @@ std::pair<BBlock*, std::string> Function::convert(BBlock* out)
 	if(this->parent->hasSymbol(funcName->name) == false)
 	{
 		Node* topNode = getTop();
+		
 		// This block is not connected to the tree.
 		BBlock* funcBlock = new BBlock();
+		
 		topNode->functions.push_back(funcBlock);
 
 		Symbol sym(Data::Type::FUNCTION);
@@ -1189,7 +1195,7 @@ std::pair<BBlock*, std::string> Return::convert(BBlock* out)
 			block = new BBlock();
 			out->tExit = block;
 		}
-		makeName();
+
 		block->instructions.push_back(ThreeAd(getNameASM(this->name), "ret", getNameASM(retExp->name), getNameASM(retExp->name), retExp->data.type, block));
 	}
 	else
@@ -1199,7 +1205,7 @@ std::pair<BBlock*, std::string> Return::convert(BBlock* out)
 			block = new BBlock();
 			out->tExit = block;
 		}
-		makeName();
+		
 		// Assume NUMBER as return type.
 		block->instructions.push_back(ThreeAd(getNameASM(this->name), "ret", "NIL", "NIL", Data::Type::NUMBER, block));
 	}
